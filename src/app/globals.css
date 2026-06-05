@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: #FBF7F0;
+  color: #2C3A57;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Атмосфер — зөөлөн навигацийн blur */
+.glass {
+  background: rgba(251, 247, 240, 0.82);
+  backdrop-filter: saturate(140%) blur(10px);
+}
+
+/* Тор/цэгэн background texture */
+.dot-grid {
+  background-image: radial-gradient(rgba(44, 58, 87, 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-cream px-6 py-3 hover:bg-ink-600 shadow-soft;
+  }
+  .btn-accent {
+    @apply btn bg-beak text-ink px-6 py-3 hover:bg-beak-600;
+  }
+  .btn-ghost {
+    @apply btn border border-ink/15 px-5 py-2.5 hover:border-ink/40 bg-paper;
+  }
+  .input {
+    @apply w-full rounded-2xl border border-ink/15 bg-paper px-4 py-3 outline-none focus:border-beak focus:ring-2 focus:ring-beak/30 transition;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium cursor-pointer transition;
+  }
+  .card {
+    @apply rounded-xl2 bg-paper shadow-card;
+  }
+}
+
+/* Staggered reveal */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
