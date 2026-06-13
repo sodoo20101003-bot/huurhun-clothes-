@@ -14,6 +14,7 @@ const PAY_OPTIONS = [
   { value: "card", label: "💳 Карт" },
   { value: "pocket", label: "📱 Pocket" },
   { value: "storepay", label: "🛍 StorePay" },
+  { value:  "dans", label: "dans "},
 ];
 
 const empty = {
