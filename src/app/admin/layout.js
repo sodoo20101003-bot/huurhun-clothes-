@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import SignOut from "../profile/SignOut";
 
 const NAV = [
   { href: "/admin", label: "Хянах самбар" },
+  { href: "/admin/pos", label: "💼 Касс" },
   { href: "/admin/products", label: "Бараа" },
   { href: "/admin/categories", label: "Ангилал" },
   { href: "/admin/promotions", label: "Урамшуулал" },
@@ -10,22 +14,28 @@ const NAV = [
   { href: "/admin/chat", label: "💬 Чат" },
 ];
 
-export default function AdminLayout({ children }) {
+export default async function AdminLayout({ children }) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/admin");
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (!profile?.is_admin) redirect("/");
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="font-display text-2xl font-700">Админ</h1>
-        <Link href="/" className="text-sm text-ink-400 hover:text-beak-600">← Дэлгүүр рүү</Link>
+        <Link href="/" className="text-sm text-ink-400 hover:text-ink">← Дэлгүүр рүү</Link>
       </div>
-      <div className="grid gap-6 md:grid-cols-[200px_1fr]">
-        <nav className="flex flex-row gap-2 overflow-x-auto md:flex-col">
+      <div className="grid gap-4 md:grid-cols-[200px_1fr]">
+        <aside className="space-y-1">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="chip whitespace-nowrap border-ink/15 hover:border-ink/40">
+            <Link key={n.href} href={n.href} className="block rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-cream transition">
               {n.label}
             </Link>
           ))}
-        </nav>
-        <div>{children}</div>
+          <SignOut />
+        </aside>
+        <main>{children}</main>
       </div>
     </div>
   );
