@@ -31,8 +31,8 @@ export default function POSPage() {
 
   async function load() {
     const [{ data: c }, { data: p }, { data: v }] = await Promise.all([
-      supabase.from("categories").select("id,name").order("sort"),
-      supabase.from("products").select("*, categories(name)").order("created_at", { ascending: false }),
+      supabase.from("categories").select("id,name,pair_price").order("sort"),
+      supabase.from("products").select("*, categories(name,pair_price)").order("created_at", { ascending: false }),
       supabase.from("product_variants").select("id,product_id,size,color,stock"),
     ]);
     setCats(c || []);
@@ -60,9 +60,58 @@ export default function POSPage() {
     return list;
   }, [products, activeCat, search]);
 
-  const rawTotal = cart.reduce((s, it) => s + Number(it.unitPrice) * Number(it.qty), 0);
+  // === Сагсны нийт дүнг тооцох — категорийн pair_price ашиглана ===
+  // Жишээ: "Пүүз" ангилалд pair_price = 280k бол:
+  //   2 гутал → 280k
+  //   3 гутал → 280k + (хямдралгүй 3-р барааны үнэ)
+  //   4 гутал → 560k (2 хос)
+  function computeCartTotal(items) {
+    // Эхлээд бүх барааг ширхэг бүрт нь задлах (qty=3 → 3 ширхэг бичлэг)
+    const units = [];
+    for (const it of items) {
+      for (let k = 0; k < it.qty; k++) {
+        units.push({
+          unitPrice: it.unitPrice,
+          categoryId: it.categoryId,
+          categoryPairPrice: it.categoryPairPrice || 0,
+        });
+      }
+    }
+    // Ангилалаар бүлэглэх
+    const byCat = {};
+    const noCat = [];
+    for (const u of units) {
+      if (u.categoryPairPrice > 0 && u.categoryId) {
+        if (!byCat[u.categoryId]) byCat[u.categoryId] = [];
+        byCat[u.categoryId].push(u);
+      } else {
+        noCat.push(u);
+      }
+    }
+    let total = 0;
+    // Ангилал бүрд pair_price-аар хосолж тоолно
+    for (const catId of Object.keys(byCat)) {
+      const list = byCat[catId];
+      // Үнээр өндөр → бага сортлох (хосолбол хамгийн үнэтэй 2-ыг pair_price-аар)
+      list.sort((a, b) => b.unitPrice - a.unitPrice);
+      const pairPrice = list[0].categoryPairPrice;
+      const pairs = Math.floor(list.length / 2);
+      const extras = list.length % 2;
+      total += pairs * pairPrice;
+      // Үлдсэн нэг бараа — энгийн үнээр
+      for (let k = pairs * 2; k < list.length; k++) {
+        total += list[k].unitPrice;
+      }
+    }
+    // pair_price байхгүй бараанууд
+    for (const u of noCat) total += u.unitPrice;
+    return total;
+  }
+
+  const rawTotal = computeCartTotal(cart);
+  const energyTotal = cart.reduce((s, it) => s + Number(it.unitPrice) * Number(it.qty), 0); // pair_price-гүй нийт (харьцуулалтанд)
   const finalTotal = Number(totalOverride) > 0 ? Number(totalOverride) : rawTotal;
-  const discount = rawTotal - finalTotal;
+  const discount = energyTotal - finalTotal;
 
   function addToCart(product, variant, qty = 1) {
     const existing = cart.findIndex(
@@ -90,6 +139,8 @@ export default function POSPage() {
           unitPrice: finalPrice(product.price, product.discount_percent),
           image: firstImageUrl(product.images),
           stock: variant.stock,
+          categoryId: product.category_id,
+          categoryPairPrice: Number(product.categories?.pair_price || 0),
         },
       ]);
     }
@@ -137,7 +188,7 @@ export default function POSPage() {
         })),
         paymentMethod,
         branch,
-        totalOverride: Number(totalOverride) || null,
+        totalOverride: finalTotal,
       }),
     });
     const data = await res.json();
@@ -197,11 +248,19 @@ export default function POSPage() {
 
         <div className="border-t border-ink/10 bg-cream/50 p-3 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-ink-400">Барааны үнэ</span>
-            <span>{formatPrice(rawTotal)}</span>
+            <span className="text-ink-400">Барааны үнэ (энгийн)</span>
+            <span className={energyTotal !== rawTotal ? "line-through text-ink-400" : ""}>
+              {formatPrice(energyTotal)}
+            </span>
           </div>
+          {energyTotal !== rawTotal && (
+            <div className="flex justify-between text-sm text-green-700">
+              <span>🎁 1+1 урамшуулал автомат</span>
+              <span>{formatPrice(rawTotal)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm items-center">
-            <span className="text-ink-400">Хямдрал / Тусгай үнэ</span>
+            <span className="text-ink-400">Тусгай үнэ (гар хийсэн)</span>
             <input
               type="number"
               placeholder={String(rawTotal)}
@@ -212,7 +271,7 @@ export default function POSPage() {
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-sm text-green-700">
-              <span>📉 Хямдарсан</span>
+              <span>📉 Нийт хямдарсан</span>
               <span>-{formatPrice(discount)}</span>
             </div>
           )}
