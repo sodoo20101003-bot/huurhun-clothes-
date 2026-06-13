@@ -358,9 +358,6 @@ export default function AdminProducts() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-xl font-600">Бараа ({products.length})</h2>
         <div className="flex gap-2">
-          <button onClick={openPairModal} className="btn-ghost border border-beak/30 bg-beak-100 text-beak-600 font-semibold">
-            🛍 1+1 зарах
-          </button>
           <button onClick={startNew} className="btn-accent">+ Шинэ бараа</button>
         </div>
       </div>
@@ -656,13 +653,6 @@ export default function AdminProducts() {
                 title="Ачаа орох → үлдэгдэлд нэмэх"
               >
                 📥 Ачаа
-              </button>
-              <button
-                onClick={() => shopSold(p)}
-                className="rounded-full border border-beak/30 bg-beak-100 px-3 py-2 text-xs font-semibold text-beak-600 hover:bg-beak/20 transition"
-                title="Дэлгүүрт зарагдсан → үлдэгдлээс хасах"
-              >
-                🏪 Зарагдсан
               </button>
               <button onClick={() => startEdit(p)} className="btn-ghost !py-2 !px-3 text-sm">Засах</button>
               <button onClick={() => remove(p.id)} className="text-sm text-red-500 hover:underline">Устгах</button>
