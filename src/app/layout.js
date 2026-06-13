@@ -4,6 +4,7 @@ import { FavoritesProvider } from "@/context/FavoritesContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LiveChatBubble from "@/components/LiveChatBubble";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 export const metadata = {
   title: "huurhun_clothes",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }) {
             <LiveChatBubble />
           </CartProvider>
         </FavoritesProvider>
+        <GoogleAnalytics />
       </body>
     </html>
   );

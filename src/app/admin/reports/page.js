@@ -2,6 +2,12 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/utils";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell, Legend,
+} from "recharts";
+
+const CHART_COLORS = ["#F2A24E", "#2C3A57", "#22c55e", "#3b82f6", "#ec4899", "#a855f7", "#f59e0b"];
 
 // Төлбөрийн төрлийн монгол нэр
 const PAY_LABELS = {
@@ -132,6 +138,35 @@ export default function ReportsPage() {
   }
   const dayRows = Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0]));
 
+  // === ГРАФИКИЙН ӨГӨГДӨЛ ===
+  const last30Days = [];
+  const today = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = dayKey(d);
+    const dayData = sales.filter((s) => dayKey(s.created_at) === key);
+    const revenue = dayData.reduce((sum, x) => sum + Number(x.total || 0), 0);
+    const qty = dayData.reduce((sum, x) => sum + Number(x.qty || 0), 0);
+    last30Days.push({
+      day: `${d.getMonth() + 1}/${d.getDate()}`,
+      orlogo: revenue,
+      shirhe: qty,
+    });
+  }
+
+  const pieData = paymentRows.map(([label, v]) => ({
+    name: label,
+    value: v.revenue,
+  }));
+
+  const topProducts = productRows.slice(0, 8).map(([name, v]) => ({
+    name: name.length > 15 ? name.slice(0, 15) + "..." : name,
+    fullName: name,
+    qty: v.qty,
+    revenue: v.revenue,
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -169,6 +204,77 @@ export default function ReportsPage() {
             одоо агуулахад {Object.values(stockMap).reduce((s, x) => s + x, 0)} үлдсэн
           </p>
         </div>
+      </div>
+
+      {/* === ГРАФИКУУД === */}
+      <div className="card p-5">
+        <h3 className="font-display font-600">📈 Сүүлийн 30 хоногийн орлого</h3>
+        <div className="mt-4 h-64 -mx-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={last30Days}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2C3A5722" />
+              <XAxis dataKey="day" stroke="#2C3A5799" style={{ fontSize: 11 }} />
+              <YAxis stroke="#2C3A5799" style={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ background: "#FBF7F0", border: "1px solid #2C3A5733", borderRadius: 12 }}
+                formatter={(value) => [formatPrice(value), "Орлого"]}
+              />
+              <Line type="monotone" dataKey="orlogo" stroke="#F2A24E" strokeWidth={3} dot={{ fill: "#F2A24E", r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Доод 2 chart side by side */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Pie chart — Төлбөрийн төрөл */}
+        {pieData.length > 0 && (
+          <div className="card p-5">
+            <h3 className="font-display font-600">🥧 Төлбөрийн хуваарилалт</h3>
+            <div className="mt-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={(e) => `${e.name}`}
+                    labelLine={false}
+                    style={{ fontSize: 11 }}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatPrice(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Bar chart — ТОП бараа */}
+        {topProducts.length > 0 && (
+          <div className="card p-5">
+            <h3 className="font-display font-600">🏆 ТОП 8 зарагдсан бараа</h3>
+            <div className="mt-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topProducts} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2C3A5722" />
+                  <XAxis type="number" stroke="#2C3A5799" style={{ fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" stroke="#2C3A5799" style={{ fontSize: 10 }} width={100} />
+                  <Tooltip
+                    contentStyle={{ background: "#FBF7F0", border: "1px solid #2C3A5733", borderRadius: 12 }}
+                    formatter={(value, name, props) => [`${value} ширхэг`, props.payload.fullName]}
+                  />
+                  <Bar dataKey="qty" fill="#F2A24E" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* === САЛБАРААР === */}
