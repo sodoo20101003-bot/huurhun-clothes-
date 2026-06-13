@@ -4,10 +4,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 // Дэлгүүрээс зарагдсан барааг бүртгэх
-// Body: { productId, productName, size, color, qty, unitPrice, paymentMethod: 'cash'|'card' }
+// Body: { productId, productName, size, color, qty, unitPrice, paymentMethod, branch }
 export async function POST(request) {
   try {
-    const { productId, productName, size, color, qty, unitPrice, paymentMethod } = await request.json();
+    const { productId, productName, size, color, qty, unitPrice, paymentMethod, branch } = await request.json();
 
     if (!productName || !qty) {
       return NextResponse.json({ error: "Мэдээлэл дутуу" }, { status: 400 });
@@ -44,6 +44,7 @@ export async function POST(request) {
       total: Number(unitPrice || 0) * Number(qty),
       channel: "shop",
       payment_method: paymentMethod || "cash",
+      branch: branch || null,
       order_code: null,
     });
 

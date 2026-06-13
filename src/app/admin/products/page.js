@@ -14,7 +14,12 @@ const PAY_OPTIONS = [
   { value: "card", label: "💳 Карт" },
   { value: "pocket", label: "📱 Pocket" },
   { value: "storepay", label: "🛍 StorePay" },
-  { value:  "dans", label: "dans "},
+  { value: "dans", label: "🏦 Данс" },
+];
+
+const BRANCH_OPTIONS = [
+  { value: "branch1", label: "Салбар 1" },
+  { value: "branch2", label: "Салбар 2" },
 ];
 
 const empty = {
@@ -38,6 +43,7 @@ export default function AdminProducts() {
   const [pairModal, setPairModal] = useState(false);
   const [pairItems, setPairItems] = useState([null, null]); // [{product, variant, qty}, ...]
   const [pairPay, setPairPay] = useState("cash");
+  const [pairBranch, setPairBranch] = useState("branch1");
   const [pairPrice, setPairPrice] = useState("");
   const [pairBusy, setPairBusy] = useState(false);
 
@@ -102,6 +108,7 @@ export default function AdminProducts() {
     setPairItems([null, null]);
     setPairPrice("");
     setPairPay("cash");
+    setPairBranch("branch1");
     setPairModal(true);
   }
 
@@ -145,6 +152,7 @@ export default function AdminProducts() {
         ],
         totalPrice: total,
         paymentMethod: pairPay,
+        branch: pairBranch,
       }),
     });
     const data = await res.json();
@@ -223,13 +231,19 @@ export default function AdminProducts() {
       return;
     }
     const payStr = prompt(
-      `Төлбөрийн төрөл?\n\n1 — Бэлэн мөнгө\n2 — Карт\n3 — Pocket\n4 — StorePay\n\nДугаараа оруулна уу:`,
+      `Төлбөрийн төрөл?\n\n1 — Бэлэн мөнгө\n2 — Карт\n3 — Pocket\n4 — StorePay\n5 — Данс\n\nДугаараа оруулна уу:`,
       "1"
     );
     if (!payStr) return;
-    const PAY_MAP = { "1": "cash", "2": "card", "3": "pocket", "4": "storepay" };
+    const PAY_MAP = { "1": "cash", "2": "card", "3": "pocket", "4": "storepay", "5": "dans" };
     const paymentMethod = PAY_MAP[payStr.trim()] || "cash";
-    const PAY_LABEL = { cash: "Бэлэн", card: "Карт", pocket: "Pocket", storepay: "StorePay" };
+    const PAY_LABEL = { cash: "Бэлэн", card: "Карт", pocket: "Pocket", storepay: "StorePay", dans: "Данс" };
+
+    // Аль салбараас зарагдсан?
+    const branchStr = prompt(`Аль салбар?\n\n1 — Салбар 1\n2 — Салбар 2\n\nДугаараа оруулна уу:`, "1");
+    if (!branchStr) return;
+    const branch = branchStr.trim() === "2" ? "branch2" : "branch1";
+    const BRANCH_LABEL = { branch1: "Салбар 1", branch2: "Салбар 2" };
 
     const res = await fetch("/api/shop-sale", {
       method: "POST",
@@ -242,11 +256,12 @@ export default function AdminProducts() {
         qty,
         unitPrice: finalPrice(product.price, product.discount_percent),
         paymentMethod,
+        branch,
       }),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error || "Алдаа гарлаа"); return; }
-    alert(`✅ ${product.name} — ${qty} ширхэг (${PAY_LABEL[paymentMethod]}) зарагдлаа!`);
+    alert(`✅ ${product.name} — ${qty} ширхэг (${PAY_LABEL[paymentMethod]} · ${BRANCH_LABEL[branch]}) зарагдлаа!`);
     await load();
   }
 
@@ -448,6 +463,24 @@ export default function AdminProducts() {
                       }`}
                     >
                       {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1.5">🏪 Салбар</label>
+                <div className="flex flex-wrap gap-2">
+                  {BRANCH_OPTIONS.map((b) => (
+                    <button
+                      key={b.value}
+                      onClick={() => setPairBranch(b.value)}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                        pairBranch === b.value
+                          ? "bg-ink text-cream border-ink"
+                          : "bg-paper border-ink/15 hover:border-beak"
+                      }`}
+                    >
+                      {b.label}
                     </button>
                   ))}
                 </div>
