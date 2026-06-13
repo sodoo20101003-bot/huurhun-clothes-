@@ -9,6 +9,7 @@ const PAY_LABELS = {
   xac: "Хас банк", qpay: "QPay", cash: "Бэлэн мөнгө", card: "Карт",
   mbank: "М банк", most: "MostMoney", ard: "Ard", monpay: "Monpay",
   socialpay: "SocialPay", toki: "Toki", pocket: "Pocket", storepay: "StorePay",
+  dans: "Данс",
 };
 function payLabel(m) {
   if (!m) return "Бусад";
@@ -17,6 +18,14 @@ function payLabel(m) {
     if (key.includes(k)) return PAY_LABELS[k];
   }
   return m;
+}
+
+const BRANCH_LABELS = {
+  branch1: "Салбар 1",
+  branch2: "Салбар 2",
+};
+function branchLabel(b) {
+  return BRANCH_LABELS[b] || "—";
 }
 
 function monthKey(d) {
@@ -43,7 +52,6 @@ export default function ReportsPage() {
       supabase.from("product_variants").select("product_id,stock"),
     ]).then(([salesRes, prodRes, varRes]) => {
       setSales(salesRes.data || []);
-      // Бараа бүрийн одоогийн нийт үлдэгдэл
       const stockByProduct = {};
       const nameById = {};
       for (const p of (prodRes.data || [])) nameById[p.id] = p.name;
@@ -59,11 +67,9 @@ export default function ReportsPage() {
 
   if (loading) return <p className="text-ink-400">Ачаалж байна...</p>;
 
-  // Боломжит сарууд
   const months = [...new Set(sales.map((s) => monthKey(s.created_at)))].sort().reverse();
   if (months.length === 0) months.push(monthKey(new Date()));
 
-  // Сонгосон сарын борлуулалт
   const monthSales = sales.filter((s) => monthKey(s.created_at) === selectedMonth);
 
   // === Сарын нийт ===
@@ -76,7 +82,21 @@ export default function ReportsPage() {
   const webQty = webSales.reduce((s, x) => s + Number(x.qty || 0), 0);
   const shopQty = shopSales.reduce((s, x) => s + Number(x.qty || 0), 0);
 
-  // === Төлбөрийн төрлөөр ===
+  // === Салбараар (зөвхөн дэлгүүрийн зарагдалт) ===
+  const byBranch = {};
+  for (const s of shopSales) {
+    const key = s.branch || "branch1";
+    if (!byBranch[key]) byBranch[key] = { qty: 0, revenue: 0, byPay: {} };
+    byBranch[key].qty += Number(s.qty || 0);
+    byBranch[key].revenue += Number(s.total || 0);
+    const payKey = payLabel(s.payment_method);
+    if (!byBranch[key].byPay[payKey]) byBranch[key].byPay[payKey] = { qty: 0, revenue: 0 };
+    byBranch[key].byPay[payKey].qty += Number(s.qty || 0);
+    byBranch[key].byPay[payKey].revenue += Number(s.total || 0);
+  }
+  const branchRows = Object.entries(byBranch).sort((a, b) => b[1].revenue - a[1].revenue);
+
+  // === Төлбөрийн төрлөөр (нийт) ===
   const byPayment = {};
   for (const s of monthSales) {
     const label = payLabel(s.payment_method);
@@ -95,7 +115,6 @@ export default function ReportsPage() {
     byProduct[key].revenue += Number(s.total || 0);
     if (s.channel === "web") byProduct[key].web += Number(s.qty || 0);
     else byProduct[key].shop += Number(s.qty || 0);
-    // Размер + өнгө бүрээр
     const vKey = [s.size, s.color].filter(Boolean).join(" / ") || "—";
     byProduct[key].variants[vKey] = (byProduct[key].variants[vKey] || 0) + Number(s.qty || 0);
   }
@@ -115,7 +134,6 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Сар сонгох */}
       <div className="flex items-center gap-3">
         <h2 className="font-display text-lg font-700">📊 Борлуулалтын тайлан</h2>
         <select
@@ -127,7 +145,7 @@ export default function ReportsPage() {
         </select>
       </div>
 
-      {/* Сарын нийт дүн */}
+      {/* === Сарын нийт === */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="card p-5 bg-ink text-cream">
           <p className="text-xs text-cream/60">💰 Нийт орлого</p>
@@ -153,9 +171,47 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Төлбөрийн төрлөөр */}
+      {/* === САЛБАРААР === */}
+      {branchRows.length > 0 && (
+        <div className="card p-5">
+          <h3 className="font-display font-600">🏪 Салбар бүрийн орлого</h3>
+          <p className="text-xs text-ink-400 mt-1">
+            Дэлгүүрийн зарагдалт салбараар хуваагдсан. Вэб захиалга энд ороогүй.
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {branchRows.map(([branch, b]) => (
+              <div key={branch} className="rounded-xl border border-ink/10 bg-cream/50 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-display font-700 text-lg">{branchLabel(branch)}</p>
+                  <p className="font-display font-700 text-beak-600">{formatPrice(b.revenue)}</p>
+                </div>
+                <p className="text-xs text-ink-400 mb-3">{b.qty} ширхэг зарагдсан</p>
+                <div className="space-y-1.5 border-t border-ink/10 pt-2">
+                  {Object.entries(b.byPay)
+                    .sort((a, b) => b[1].revenue - a[1].revenue)
+                    .map(([pay, v]) => (
+                      <div key={pay} className="flex items-center text-sm">
+                        <span className="flex-1">{pay}</span>
+                        <span className="text-xs text-ink-400 mr-3">{v.qty}ш</span>
+                        <span className="font-display font-600">{formatPrice(v.revenue)}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Нэгдсэн орлого */}
+          <div className="mt-4 flex items-center justify-between rounded-xl bg-ink text-cream p-4">
+            <span className="font-display font-700">💼 Нэгдсэн орлого (бүх салбар)</span>
+            <span className="font-display font-700 text-xl">{formatPrice(shopRevenue)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* === Төлбөрийн төрлөөр === */}
       <div className="card p-5">
-        <h3 className="font-display font-600">💳 Төлбөрийн төрлөөр</h3>
+        <h3 className="font-display font-600">💳 Төлбөрийн төрлөөр (нийт)</h3>
         <div className="mt-3 space-y-2">
           {paymentRows.map(([label, v]) => (
             <div key={label} className="flex items-center gap-3 text-sm">
@@ -168,7 +224,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Бараагаар */}
+      {/* === Бараагаар === */}
       <div className="card p-5">
         <h3 className="font-display font-600">👕 Бараагаар (зарагдсан + одоогийн үлдэгдэл)</h3>
         <div className="mt-3 overflow-x-auto">
@@ -222,7 +278,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Өдөр бүрээр */}
+      {/* === Өдөр бүрээр === */}
       <div className="card p-5">
         <h3 className="font-display font-600">📅 Өдөр бүрээр (дарж дэлгэрэнгүй харах)</h3>
         <div className="mt-3 space-y-2">
@@ -242,7 +298,6 @@ export default function ReportsPage() {
                   <span className="font-display font-600 w-28 text-right">{formatPrice(v.revenue)}</span>
                 </button>
 
-                {/* Дэлгэрэнгүй */}
                 {isOpen && (
                   <div className="border-t border-ink/10 bg-paper p-3 space-y-2">
                     {daySales.map((s) => (
@@ -252,7 +307,7 @@ export default function ReportsPage() {
                           {[s.size, s.color].filter(Boolean).join(" / ") || "—"} ×{s.qty}
                         </span>
                         <span className={`chip text-xs ${s.channel === "web" ? "border-blue-300 text-blue-700" : "border-beak/30 text-beak-600"}`}>
-                          {s.channel === "web" ? "🌐 Вэб" : "🏪 Дэлгүүр"}
+                          {s.channel === "web" ? "🌐 Вэб" : "🏪 " + branchLabel(s.branch)}
                         </span>
                         <span className="chip text-xs border-ink/20">
                           💳 {payLabel(s.payment_method)}
