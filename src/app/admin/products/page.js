@@ -11,7 +11,7 @@ const COMMON_COLORS = ["Хар", "Цагаан", "Саарал", "Хүрэн", "
 
 const empty = {
   id: null, name: "", description: "", price: "", discount_percent: 0,
-  category_id: "", brand: "", images: [],
+  category_id: "", brand_id: "", images: [],
   variants: [{ size: "", color: "", stock: "" }],
   pair_price: "",
   gift_note: "",
@@ -20,6 +20,7 @@ const empty = {
 export default function AdminProducts() {
   const supabase = createClient();
   const [cats, setCats] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(empty);
   const [open, setOpen] = useState(false);
@@ -27,12 +28,14 @@ export default function AdminProducts() {
   const [sizeType, setSizeType] = useState("Хувцас");
 
   async function load() {
-    const [{ data: c }, { data: p }, { data: v }] = await Promise.all([
+    const [{ data: c }, { data: br }, { data: p }, { data: v }] = await Promise.all([
       supabase.from("categories").select("id,name").order("sort"),
-      supabase.from("products").select("*, categories(name)").order("created_at", { ascending: false }),
+      supabase.from("brands").select("id,name,logo_url").order("sort").order("name"),
+      supabase.from("products").select("*, categories(name), brands(name,logo_url)").order("created_at", { ascending: false }),
       supabase.from("product_variants").select("product_id,size,color,stock"),
     ]);
     setCats(c || []);
+    setBrands(br || []);
     const variantsByProduct = {};
     for (const x of (v || [])) {
       if (!variantsByProduct[x.product_id]) variantsByProduct[x.product_id] = [];
@@ -47,11 +50,6 @@ export default function AdminProducts() {
   }
   useEffect(() => { load(); }, []);
 
-  // Бүх брэндүүд (одоо байгаа)
-  const allBrands = useMemo(() => {
-    return [...new Set(products.map((p) => p.brand).filter(Boolean))].sort();
-  }, [products]);
-
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
   const productColors = useMemo(
@@ -59,19 +57,15 @@ export default function AdminProducts() {
     [form.variants]
   );
 
-  // Ачаа орох → API руу — restock_logs-д бичигдэнэ
   async function restock(product) {
     if (!product._variants?.length) {
-      alert("Энэ бараанд variant байхгүй. Эхлээд 'Засах' дарж размер/өнгөө нэмнэ үү.");
+      alert("Энэ бараанд variant байхгүй. Эхлээд 'Засах' дарна уу.");
       return;
     }
     const choices = product._variants
-      .map((v, i) => {
-        const label = [v.size, v.color].filter(Boolean).join(" / ") || "—";
-        return `${i + 1}. ${label} (одоо: ${v.stock})`;
-      })
+      .map((v, i) => `${i + 1}. ${[v.size, v.color].filter(Boolean).join(" / ") || "—"} (одоо: ${v.stock})`)
       .join("\n");
-    const pickStr = prompt(`"${product.name}"\n\nАль хэмжээ/өнгөнд ачаа орсон бэ?\n\n${choices}\n\nДугаараа оруулна уу:`);
+    const pickStr = prompt(`"${product.name}"\n\nАль хэмжээ/өнгөнд?\n\n${choices}\n\nДугаараа:`);
     if (!pickStr) return;
     const idx = Number(pickStr) - 1;
     if (isNaN(idx) || idx < 0 || idx >= product._variants.length) return alert("Буруу дугаар.");
@@ -79,7 +73,7 @@ export default function AdminProducts() {
     const qtyStr = prompt(`Хэдэн ширхэг нэмэх вэ?`, "10");
     if (!qtyStr) return;
     const qty = Number(qtyStr);
-    if (isNaN(qty) || qty < 1) return alert("Зөв тоо оруулна уу.");
+    if (isNaN(qty) || qty < 1) return alert("Зөв тоо.");
     const note = prompt("Тэмдэглэл (заавал биш):", "") || "";
 
     const res = await fetch("/api/restock", {
@@ -90,13 +84,12 @@ export default function AdminProducts() {
         productName: product.name,
         size: variant.size || null,
         color: variant.color || null,
-        qty,
-        note,
+        qty, note,
       }),
     });
     const data = await res.json();
     if (!res.ok) return alert(data.error || "Алдаа");
-    alert(`✅ ${product.name} (${[variant.size, variant.color].filter(Boolean).join("/")}) — ${qty} ширхэг нэмэгдэж нийт ${data.newStock} болсон.\n\n📥 Ачааны түүхэд бүртгэгдсэн.`);
+    alert(`✅ ${qty} ширхэг нэмэгдэж нийт ${data.newStock} болсон.`);
     await load();
   }
 
@@ -143,7 +136,8 @@ export default function AdminProducts() {
     setForm({
       id: p.id, name: p.name, description: p.description || "",
       price: p.price, discount_percent: p.discount_percent || 0,
-      category_id: p.category_id || "", brand: p.brand || "",
+      category_id: p.category_id || "",
+      brand_id: p.brand_id || "",
       images: normalizeImages(p.images),
       variants: [{ size: "", color: "", stock: "" }],
       pair_price: p.pair_price || "",
@@ -162,7 +156,7 @@ export default function AdminProducts() {
       name: form.name, description: form.description,
       price: Number(form.price), discount_percent: Number(form.discount_percent) || 0,
       category_id: form.category_id || null,
-      brand: form.brand ? form.brand.trim() : null,
+      brand_id: form.brand_id || null,
       images: form.images,
       pair_price: Number(form.pair_price) || null,
       gift_note: form.gift_note || null,
@@ -203,45 +197,32 @@ export default function AdminProducts() {
 
           <div className="rounded-xl bg-cream/50 p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">1. Үндсэн мэдээлэл</p>
-            <input className="input" placeholder="Барааны нэр (ж: Air Jordan 1 Low)" value={form.name} onChange={(e) => set("name", e.target.value)} />
-            <div className="grid gap-3 sm:grid-cols-3">
-              <select className="input" value={form.category_id} onChange={(e) => set("category_id", e.target.value)}>
-                <option value="">— Ангилал —</option>
-                {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <input className="input" type="number" placeholder="Үнэ (₮)" value={form.price} onChange={(e) => set("price", e.target.value)} />
-              <input className="input" type="number" placeholder="Хямдрал (%)" value={form.discount_percent} onChange={(e) => set("discount_percent", e.target.value)} />
+            <input className="input" placeholder="Барааны нэр (ж: Nike Vomero 5)" value={form.name} onChange={(e) => set("name", e.target.value)} />
+
+            {/* АНГИЛАЛ + БРЭНД */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">🗂 Ангилал</label>
+                <select className="input" value={form.category_id} onChange={(e) => set("category_id", e.target.value)}>
+                  <option value="">— Сонгох —</option>
+                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">🏷 Брэнд</label>
+                <select className="input" value={form.brand_id} onChange={(e) => set("brand_id", e.target.value)}>
+                  <option value="">— Брэнд байхгүй —</option>
+                  {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                {brands.length === 0 && (
+                  <p className="text-xs text-beak-600 mt-1">💡 "🏷 Брэнд" хуудаснаас эхлээд нэмнэ үү</p>
+                )}
+              </div>
             </div>
 
-            {/* БРЭНД */}
-            <div className="rounded-lg bg-paper border border-ink/10 p-3 space-y-2">
-              <p className="text-sm font-semibold">🏷 Брэнд (Nike, Puma, adidas...)</p>
-              <input
-                className="input"
-                placeholder="Жишээ: Nike"
-                value={form.brand}
-                onChange={(e) => set("brand", e.target.value)}
-                list="brands-list"
-              />
-              <datalist id="brands-list">
-                {allBrands.map((b) => <option key={b} value={b} />)}
-              </datalist>
-              {allBrands.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {allBrands.map((b) => (
-                    <button
-                      key={b}
-                      type="button"
-                      onClick={() => set("brand", b)}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${
-                        form.brand === b ? "border-beak bg-beak-100 text-beak-600 font-semibold" : "border-ink/10 hover:bg-cream"
-                      }`}
-                    >
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input className="input" type="number" placeholder="Үнэ (₮)" value={form.price} onChange={(e) => set("price", e.target.value)} />
+              <input className="input" type="number" placeholder="Хямдрал (%)" value={form.discount_percent} onChange={(e) => set("discount_percent", e.target.value)} />
             </div>
 
             <textarea className="input min-h-20" placeholder="Тайлбар (заавал биш)" value={form.description} onChange={(e) => set("description", e.target.value)} />
@@ -251,7 +232,7 @@ export default function AdminProducts() {
               <input
                 className="input"
                 type="number"
-                placeholder="2 ширхэгийн багц үнэ — ж: 280000"
+                placeholder="280000"
                 value={form.pair_price}
                 onChange={(e) => set("pair_price", e.target.value)}
               />
@@ -280,12 +261,11 @@ export default function AdminProducts() {
                   const exists = form.variants.some((v) => v.size === s);
                   return (
                     <button key={s} onClick={() => addSizeQuick(s)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm transition ${exists ? "border-ink bg-ink text-cream" : "border-ink/15 hover:border-ink/40"}`}>{s}</button>
+                      className={`rounded-lg border px-3 py-1.5 text-sm transition ${exists ? "border-ink bg-ink text-cream" : "border-ink/15"}`}>{s}</button>
                   );
                 })}
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <div className="grid grid-cols-[1fr_1fr_90px_36px] gap-2 text-xs font-semibold text-ink-400 px-1 mb-1 min-w-[340px]">
                 <span>Хэмжээ</span><span>Өнгө</span><span>Тоо</span><span></span>
@@ -296,7 +276,7 @@ export default function AdminProducts() {
                     <input className="input !py-2.5 !rounded-lg" placeholder="40, M" value={v.size} onChange={(e) => setVariant(i, "size", e.target.value)} />
                     <input className="input !py-2.5 !rounded-lg" placeholder="Хар" value={v.color} onChange={(e) => setVariant(i, "color", e.target.value)} />
                     <input className="input !py-2.5 !rounded-lg text-center" type="number" placeholder="0" value={v.stock} onChange={(e) => setVariant(i, "stock", e.target.value)} />
-                    <button onClick={() => rmVariant(i)} className="grid h-10 w-9 place-items-center rounded-lg text-red-400 hover:bg-red-50 transition">✕</button>
+                    <button onClick={() => rmVariant(i)} className="grid h-10 w-9 place-items-center rounded-lg text-red-400 hover:bg-red-50">✕</button>
                   </div>
                 ))}
               </div>
@@ -313,7 +293,7 @@ export default function AdminProducts() {
                     <img src={img.url} alt="" className="h-28 w-28 rounded-xl object-cover" />
                     <button
                       onClick={() => set("images", form.images.filter((_, x) => x !== i))}
-                      className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white opacity-0 group-hover:opacity-100 transition"
+                      className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white opacity-0 group-hover:opacity-100"
                     >×</button>
                   </div>
                   <select
@@ -337,7 +317,7 @@ export default function AdminProducts() {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button onClick={save} disabled={busy} className="btn-primary flex-1">{busy ? "Хадгалж байна..." : "💾 Хадгалах"}</button>
+            <button onClick={save} disabled={busy} className="btn-primary flex-1">{busy ? "Хадгалж..." : "💾 Хадгалах"}</button>
             <button onClick={() => { setOpen(false); setForm(empty); }} className="btn-ghost">Болих</button>
           </div>
         </div>
@@ -351,8 +331,9 @@ export default function AdminProducts() {
                 {firstImageUrl(p.images) && <img src={firstImageUrl(p.images)} alt="" className="h-full w-full object-cover" />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {p.brand && <span className="rounded-md bg-beak-100 text-beak-600 px-1.5 py-0.5 text-[10px] font-bold uppercase">{p.brand}</span>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {p.brands?.logo_url && <img src={p.brands.logo_url} alt={p.brands?.name} className="h-4 w-4 object-contain" />}
+                  {p.brands?.name && <span className="rounded-md bg-beak-100 text-beak-600 px-1.5 py-0.5 text-[10px] font-bold uppercase">{p.brands.name}</span>}
                   <p className="font-semibold truncate">{p.name}</p>
                 </div>
                 <p className="text-xs text-ink-400">
@@ -372,24 +353,17 @@ export default function AdminProducts() {
               <button onClick={() => startEdit(p)} className="btn-ghost !py-2 !px-3 text-sm">Засах</button>
               <button onClick={() => remove(p.id)} className="text-sm text-red-500 hover:underline">Устгах</button>
             </div>
-
             {p._variants?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5 pl-[68px]">
                 {p._variants.map((v, i) => {
-                  const label = [v.size, v.color].filter(Boolean).join(" / ") || "—";
                   const stock = Number(v.stock || 0);
                   return (
-                    <span
-                      key={i}
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        stock === 0
-                          ? "bg-red-50 text-red-600 border border-red-200"
-                          : stock < 5
-                          ? "bg-beak-100 text-beak-600 border border-beak/30"
-                          : "bg-green-50 text-green-700 border border-green-200"
-                      }`}
-                    >
-                      {label}: {stock}
+                    <span key={i} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      stock === 0 ? "bg-red-50 text-red-600 border border-red-200" :
+                      stock < 5 ? "bg-beak-100 text-beak-600 border border-beak/30" :
+                      "bg-green-50 text-green-700 border border-green-200"
+                    }`}>
+                      {[v.size, v.color].filter(Boolean).join(" / ") || "—"}: {stock}
                     </span>
                   );
                 })}
