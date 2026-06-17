@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   const supabase = createClient();
 
-  // Хугацаа: эхнээс өнөөдрийн 7 хоног, 30 хоног
   const now = new Date();
   const last7d = new Date(now.getTime() - 7 * 86400000).toISOString();
   const last30d = new Date(now.getTime() - 30 * 86400000).toISOString();
@@ -22,6 +21,7 @@ export default async function AdminDashboard() {
     { data: orders7d },
     { data: orders30d },
     { data: recent },
+    { data: variants },
   ] = await Promise.all([
     supabase.from("products").select("*", { count: "exact", head: true }),
     supabase.from("orders").select("*", { count: "exact", head: true }),
@@ -32,15 +32,18 @@ export default async function AdminDashboard() {
     supabase.from("orders").select("total").eq("payment_status", "paid").gte("created_at", last7d),
     supabase.from("orders").select("total").eq("payment_status", "paid").gte("created_at", last30d),
     supabase.from("orders").select("order_code,customer_name,total,payment_status,created_at").order("created_at", { ascending: false }).limit(8),
+    supabase.from("product_variants").select("stock"),
   ]);
 
-  // Орлого тооцоо
   const totalRevenue = (allPaidOrders || []).reduce((s, o) => s + Number(o.total || 0), 0);
   const revenue7d = (orders7d || []).reduce((s, o) => s + Number(o.total || 0), 0);
   const revenue30d = (orders30d || []).reduce((s, o) => s + Number(o.total || 0), 0);
 
-  // Зарагдсан барааны статистик
-  const productSales = {}; // { name: { qty, revenue } }
+  // НИЙТ ҮЛДЭГДЛИЙН ТОО (бүх variant-ийн нийлбэр)
+  const totalStock = (variants || []).reduce((s, v) => s + Number(v.stock || 0), 0);
+  const variantsCount = (variants || []).length;
+
+  const productSales = {};
   for (const o of allPaidOrders || []) {
     for (const it of (o.items || [])) {
       const key = it.name || "Тодорхойгүй";
@@ -56,7 +59,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* === НИЙТ СТАТИСТИК === */}
+      {/* === НИЙТ ОРЛОГО === */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="card p-5 bg-ink text-cream">
           <p className="text-xs text-cream/60">💰 Нийт орлого</p>
@@ -80,11 +83,17 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* === ТОО === */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* === НӨӨЦ + ЗАХИАЛГА === */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="card p-5 bg-green-50 border border-green-200">
+          <p className="text-xs text-green-700">📦 Нийт нөөц</p>
+          <p className="mt-1 font-display text-2xl font-700 text-green-700">{totalStock}</p>
+          <p className="mt-1 text-xs text-green-700/70">ширхэг бараа агуулахад</p>
+        </div>
         <div className="card p-4 text-center">
-          <p className="text-xs text-ink-400">Нийт бараа</p>
+          <p className="text-xs text-ink-400">Бараа төрөл</p>
           <p className="mt-1 font-display text-2xl font-700">{productsCount || 0}</p>
+          <p className="mt-1 text-xs text-ink-400">{variantsCount} variant</p>
         </div>
         <div className="card p-4 text-center">
           <p className="text-xs text-ink-400">Нийт захиалга</p>
@@ -96,7 +105,7 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* === ТОП ЗАРАГДСАН БАРАА === */}
+      {/* === ТОП ЗАРАГДСАН === */}
       {topProducts.length > 0 && (
         <div className="card p-5">
           <h2 className="font-display font-600">🏆 Хамгийн их зарагдсан бараа</h2>
