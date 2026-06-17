@@ -5,13 +5,15 @@ import SignOut from "../profile/SignOut";
 
 const NAV = [
   { href: "/admin", label: "Хянах самбар" },
-  { href: "/admin/pos", label: "💼 Касс" },
   { href: "/admin/products", label: "Бараа" },
+  { href: "/admin/restock-history", label: "📥 Ачааны түүх" },
   { href: "/admin/categories", label: "Ангилал" },
   { href: "/admin/promotions", label: "Урамшуулал" },
   { href: "/admin/orders", label: "Захиалга" },
   { href: "/admin/reports", label: "📊 Тайлан" },
+  { href: "/admin/users", label: "👥 Хэрэглэгчид" },
   { href: "/admin/chat", label: "💬 Чат" },
+  { href: "/kassa", label: "💼 Кассаар орох →" },
 ];
 
 export default async function AdminLayout({ children }) {
@@ -29,7 +31,13 @@ export default async function AdminLayout({ children }) {
       <div className="grid gap-4 md:grid-cols-[200px_1fr]">
         <aside className="space-y-1">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="block rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-cream transition">
+            <Link
+              key={n.href}
+              href={n.href}
+              className={`block rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-cream transition ${
+                n.href === "/kassa" ? "bg-beak text-ink mt-3" : ""
+              }`}
+            >
               {n.label}
             </Link>
           ))}
