@@ -25,6 +25,9 @@ export default function KassaPage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
   const [pickProduct, setPickProduct] = useState(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({ name: "", price: "", qty: 1, categoryId: "" });
+  const [manualBusy, setManualBusy] = useState(false);
   const [branch, setBranch] = useState("branch1");
   const [totalOverride, setTotalOverride] = useState("");
   const [busy, setBusy] = useState(false);
@@ -111,6 +114,57 @@ export default function KassaPage() {
   const finalTotal = Number(totalOverride) > 0 ? Number(totalOverride) : rawTotal;
   const paidTotal = Object.values(payments).reduce((s, v) => s + (Number(v) || 0), 0);
   const remaining = finalTotal - paidTotal;
+
+  async function submitManual() {
+    if (!manualForm.name.trim() || !manualForm.price) {
+      return alert("Нэр болон үнэ заавал!");
+    }
+    const qty = Number(manualForm.qty) || 1;
+    const price = Number(manualForm.price);
+    if (price <= 0) return alert("Үнэ буруу");
+
+    setManualBusy(true);
+    // 1. Шинэ бараа үүсгэх (вэб дээр харагдана)
+    const { data: newProd, error: prodErr } = await supabase
+      .from("products")
+      .insert({
+        name: manualForm.name.trim(),
+        price,
+        discount_percent: 0,
+        category_id: manualForm.categoryId || null,
+        images: [],
+      })
+      .select("id")
+      .single();
+    if (prodErr || !newProd) {
+      setManualBusy(false);
+      return alert(prodErr?.message || "Бараа үүсгэхэд алдаа");
+    }
+    // 2. Variant үүсгэх (qty стоктой) — дараа нь sale-аар хасагдана
+    await supabase.from("product_variants").insert({
+      product_id: newProd.id,
+      size: null,
+      color: null,
+      stock: qty,
+    });
+    // 3. Сагсанд нэмэх
+    setCart((c) => [...c, {
+      productId: newProd.id,
+      productName: manualForm.name.trim(),
+      size: null,
+      color: null,
+      qty,
+      unitPrice: price,
+      image: null,
+      stock: qty,
+      categoryId: manualForm.categoryId || null,
+      categoryPairPrice: 0,
+    }]);
+    setManualBusy(false);
+    setManualOpen(false);
+    setManualForm({ name: "", price: "", qty: 1, categoryId: "" });
+    await load();
+  }
 
   function addToCart(product, variant) {
     const existing = cart.findIndex(
@@ -279,7 +333,15 @@ export default function KassaPage() {
 
       <div className="card flex flex-col overflow-hidden">
         <div className="border-b border-ink/10 p-3 space-y-2">
-          <input type="text" placeholder="🔍 Бараа хайх..." value={search} onChange={(e) => setSearch(e.target.value)} className="input" />
+          <div className="flex gap-2">
+            <input type="text" placeholder="🔍 Бараа хайх..." value={search} onChange={(e) => setSearch(e.target.value)} className="input flex-1" />
+            <button
+              onClick={() => setManualOpen(true)}
+              className="rounded-xl bg-beak text-ink px-4 py-2 text-sm font-bold whitespace-nowrap hover:bg-beak-600 hover:text-cream transition"
+            >
+              ✋ Гараар
+            </button>
+          </div>
 
           <div className="flex flex-wrap gap-1.5">
             <button onClick={() => { setActiveCat("all"); setActiveBrand("all"); }}
@@ -373,6 +435,74 @@ export default function KassaPage() {
               {pickProduct._variants.filter((v) => v.stock > 0).length === 0 && (
                 <p className="text-center text-sm text-red-500 p-4">Бүгд дууссан</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ ✋ ГАРААР БАРАА ОРУУЛАХ MODAL ============ */}
+      {manualOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => !manualBusy && setManualOpen(false)}>
+          <div className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display font-700 text-lg">✋ Гараар бараа оруулах</p>
+              <button onClick={() => setManualOpen(false)} className="text-2xl text-ink-400">×</button>
+            </div>
+            <p className="text-xs text-ink-400 mb-4">
+              Энэ бараа автоматаар вэб дэлгүүрт нэмэгдэж тайланд бүртгэгдэнэ.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Барааны нэр *</label>
+                <input
+                  className="input"
+                  placeholder="Жишээ: Nike Vomero 5"
+                  value={manualForm.name}
+                  onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Үнэ (₮) *</label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="158000"
+                  value={manualForm.price}
+                  onChange={(e) => setManualForm({ ...manualForm, price: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Тоо ширхэг</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  value={manualForm.qty}
+                  onChange={(e) => setManualForm({ ...manualForm, qty: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Ангилал (заавал биш)</label>
+                <select
+                  className="input"
+                  value={manualForm.categoryId}
+                  onChange={(e) => setManualForm({ ...manualForm, categoryId: e.target.value })}
+                >
+                  <option value="">— Сонгох —</option>
+                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={submitManual}
+                disabled={manualBusy}
+                className="btn-primary flex-1"
+              >
+                {manualBusy ? "Нэмж байна..." : "✓ Сагсанд нэмэх"}
+              </button>
+              <button onClick={() => setManualOpen(false)} disabled={manualBusy} className="btn-ghost">Болих</button>
             </div>
           </div>
         </div>
