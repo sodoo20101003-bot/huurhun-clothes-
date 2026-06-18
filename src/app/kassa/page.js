@@ -123,47 +123,21 @@ export default function KassaPage() {
     const price = Number(manualForm.price);
     if (price <= 0) return alert("Үнэ буруу");
 
-    setManualBusy(true);
-    // 1. Шинэ бараа үүсгэх (вэб дээр харагдана)
-    const { data: newProd, error: prodErr } = await supabase
-      .from("products")
-      .insert({
-        name: manualForm.name.trim(),
-        price,
-        discount_percent: 0,
-        category_id: manualForm.categoryId || null,
-        images: [],
-      })
-      .select("id")
-      .single();
-    if (prodErr || !newProd) {
-      setManualBusy(false);
-      return alert(prodErr?.message || "Бараа үүсгэхэд алдаа");
-    }
-    // 2. Variant үүсгэх (qty стоктой) — дараа нь sale-аар хасагдана
-    await supabase.from("product_variants").insert({
-      product_id: newProd.id,
-      size: null,
-      color: null,
-      stock: qty,
-    });
-    // 3. Сагсанд нэмэх
+    // Зөвхөн сагсанд нэмнэ (вэбэд бараа үүсгэхгүй)
     setCart((c) => [...c, {
-      productId: newProd.id,
+      productId: null, // вэб бараагүй
       productName: manualForm.name.trim(),
       size: null,
       color: null,
       qty,
       unitPrice: price,
       image: null,
-      stock: qty,
-      categoryId: manualForm.categoryId || null,
+      stock: 99999, // үлдэгдэл хязгааргүй (DB-д variant байхгүй тул)
+      categoryId: null,
       categoryPairPrice: 0,
     }]);
-    setManualBusy(false);
     setManualOpen(false);
     setManualForm({ name: "", price: "", qty: 1, categoryId: "" });
-    await load();
   }
 
   function addToCart(product, variant) {
@@ -442,14 +416,14 @@ export default function KassaPage() {
 
       {/* ============ ✋ ГАРААР БАРАА ОРУУЛАХ MODAL ============ */}
       {manualOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => !manualBusy && setManualOpen(false)}>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => setManualOpen(false)}>
           <div className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <p className="font-display font-700 text-lg">✋ Гараар бараа оруулах</p>
               <button onClick={() => setManualOpen(false)} className="text-2xl text-ink-400">×</button>
             </div>
             <p className="text-xs text-ink-400 mb-4">
-              Энэ бараа автоматаар вэб дэлгүүрт нэмэгдэж тайланд бүртгэгдэнэ.
+              Энэ бараа зөвхөн тухайн зарагдалтад л бүртгэгдэнэ. Вэбэд нэмэгдэхгүй.
             </p>
             <div className="space-y-3">
               <div>
@@ -482,27 +456,12 @@ export default function KassaPage() {
                   onChange={(e) => setManualForm({ ...manualForm, qty: e.target.value })}
                 />
               </div>
-              <div>
-                <label className="text-xs font-semibold text-ink-400 block mb-1">Ангилал (заавал биш)</label>
-                <select
-                  className="input"
-                  value={manualForm.categoryId}
-                  onChange={(e) => setManualForm({ ...manualForm, categoryId: e.target.value })}
-                >
-                  <option value="">— Сонгох —</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
             </div>
             <div className="flex gap-2 mt-5">
-              <button
-                onClick={submitManual}
-                disabled={manualBusy}
-                className="btn-primary flex-1"
-              >
-                {manualBusy ? "Нэмж байна..." : "✓ Сагсанд нэмэх"}
+              <button onClick={submitManual} className="btn-primary flex-1">
+                ✓ Сагсанд нэмэх
               </button>
-              <button onClick={() => setManualOpen(false)} disabled={manualBusy} className="btn-ghost">Болих</button>
+              <button onClick={() => setManualOpen(false)} className="btn-ghost">Болих</button>
             </div>
           </div>
         </div>
