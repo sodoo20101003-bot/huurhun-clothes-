@@ -22,7 +22,7 @@ export default function NewOrderPage() {
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
   const [customer, setCustomer] = useState({
-    name: "", phone: "", address: "", note: "", map_url: "",
+    name: "", phone: "", address: "", note: "", instagram: "",
     payment_method: "qpay", totalOverride: "",
   });
 
@@ -96,7 +96,7 @@ export default function NewOrderPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customer_name: customer.name, phone: customer.phone,
-        address: customer.address, note: customer.note, map_url: customer.map_url,
+        address: customer.address, note: customer.note, instagram: customer.instagram,
         items: items.map((it) => ({
           productId: it.productId, productName: it.productName,
           size: it.size, color: it.color, qty: it.qty, unitPrice: it.unitPrice,
@@ -129,8 +129,8 @@ export default function NewOrderPage() {
               value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
             <textarea className="input min-h-20" placeholder="Хаяг * (дүүрэг, хороо, байр)"
               value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} />
-            <input className="input" placeholder="📍 Google Maps холбоос (заавал биш)"
-              value={customer.map_url} onChange={(e) => setCustomer({ ...customer, map_url: e.target.value })} />
+            <input className="input" placeholder="📷 Instagram хаяг (@huurhun_clothes гэх мэт)"
+              value={customer.instagram} onChange={(e) => setCustomer({ ...customer, instagram: e.target.value })} />
             <textarea className="input min-h-16" placeholder="💬 Нэмэлт тэмдэглэл"
               value={customer.note} onChange={(e) => setCustomer({ ...customer, note: e.target.value })} />
           </div>

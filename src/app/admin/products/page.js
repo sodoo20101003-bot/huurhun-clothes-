@@ -27,6 +27,13 @@ export default function AdminProducts() {
   const [busy, setBusy] = useState(false);
   const [sizeType, setSizeType] = useState("Хувцас");
 
+  // Restock modal
+  const [restockProduct, setRestockProduct] = useState(null);
+  const [restockVariantIdx, setRestockVariantIdx] = useState(0);
+  const [restockQty, setRestockQty] = useState("10");
+  const [restockNote, setRestockNote] = useState("");
+  const [restockBusy, setRestockBusy] = useState(false);
+
   async function load() {
     const [{ data: c }, { data: br }, { data: p }, { data: v }] = await Promise.all([
       supabase.from("categories").select("id,name").order("sort"),
@@ -57,39 +64,43 @@ export default function AdminProducts() {
     [form.variants]
   );
 
-  async function restock(product) {
+  // Ачаа орох → modal нээх
+  function openRestock(product) {
     if (!product._variants?.length) {
       alert("Энэ бараанд variant байхгүй. Эхлээд 'Засах' дарна уу.");
       return;
     }
-    const choices = product._variants
-      .map((v, i) => `${i + 1}. ${[v.size, v.color].filter(Boolean).join(" / ") || "—"} (одоо: ${v.stock})`)
-      .join("\n");
-    const pickStr = prompt(`"${product.name}"\n\nАль хэмжээ/өнгөнд?\n\n${choices}\n\nДугаараа:`);
-    if (!pickStr) return;
-    const idx = Number(pickStr) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= product._variants.length) return alert("Буруу дугаар.");
-    const variant = product._variants[idx];
-    const qtyStr = prompt(`Хэдэн ширхэг нэмэх вэ?`, "10");
-    if (!qtyStr) return;
-    const qty = Number(qtyStr);
-    if (isNaN(qty) || qty < 1) return alert("Зөв тоо.");
-    const note = prompt("Тэмдэглэл (заавал биш):", "") || "";
+    setRestockProduct(product);
+    setRestockVariantIdx(0);
+    setRestockQty("10");
+    setRestockNote("");
+  }
 
+  async function submitRestock() {
+    if (!restockProduct) return;
+    const variant = restockProduct._variants[restockVariantIdx];
+    if (!variant) return alert("Variant сонгоогүй");
+    const qty = Number(restockQty);
+    if (isNaN(qty) || qty < 1) return alert("Зөв тоо оруулна уу");
+
+    setRestockBusy(true);
     const res = await fetch("/api/restock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        productId: product.id,
-        productName: product.name,
+        productId: restockProduct.id,
+        productName: restockProduct.name,
         size: variant.size || null,
         color: variant.color || null,
-        qty, note,
+        qty,
+        note: restockNote || null,
       }),
     });
     const data = await res.json();
+    setRestockBusy(false);
     if (!res.ok) return alert(data.error || "Алдаа");
     alert(`✅ ${qty} ширхэг нэмэгдэж нийт ${data.newStock} болсон.`);
+    setRestockProduct(null);
     await load();
   }
 
@@ -345,7 +356,7 @@ export default function AdminProducts() {
                 </p>
               </div>
               <button
-                onClick={() => restock(p)}
+                onClick={() => openRestock(p)}
                 className="rounded-full border border-green-500/30 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-100 transition"
               >
                 📥 Ачаа
@@ -373,6 +384,74 @@ export default function AdminProducts() {
         ))}
         {products.length === 0 && <p className="p-6 text-center text-sm text-ink-400">Бараа алга.</p>}
       </div>
+
+      {/* ========= 📥 АЧАА ОРОХ MODAL ========= */}
+      {restockProduct && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => !restockBusy && setRestockProduct(null)}>
+          <div className="card w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display font-700 text-lg">📥 Ачаа орох</p>
+              <button onClick={() => setRestockProduct(null)} className="text-2xl text-ink-400">×</button>
+            </div>
+            <p className="text-sm font-semibold mb-3">{restockProduct.name}</p>
+
+            <p className="text-xs font-semibold text-ink-400 mb-2">Аль хэмжээ/өнгөнд ачаа орсон бэ?</p>
+            <div className="space-y-1 max-h-72 overflow-y-auto mb-3 border border-ink/10 rounded-lg p-2 bg-cream/30">
+              {restockProduct._variants.map((v, i) => {
+                const label = [v.size, v.color].filter(Boolean).join(" / ") || "—";
+                const isSelected = restockVariantIdx === i;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setRestockVariantIdx(i)}
+                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+                      isSelected
+                        ? "bg-ink text-cream font-bold"
+                        : "hover:bg-paper border border-ink/5"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className={`text-xs ${isSelected ? "text-cream/70" : "text-ink-400"}`}>
+                      📦 одоо {v.stock} ширхэг
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Хэдэн ширхэг нэмэх вэ?</label>
+                <input
+                  type="number"
+                  min="1"
+                  className="input"
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Тэмдэглэл (заавал биш)</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Жишээ: Нийлүүлэгч А"
+                  value={restockNote}
+                  onChange={(e) => setRestockNote(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button onClick={submitRestock} disabled={restockBusy} className="btn-primary flex-1">
+                {restockBusy ? "Нэмж..." : "✓ Ачаа оруулах"}
+              </button>
+              <button onClick={() => setRestockProduct(null)} disabled={restockBusy} className="btn-ghost">Болих</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

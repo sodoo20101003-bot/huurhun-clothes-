@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request) {
   try {
     const {
-      customer_name, phone, address, note, map_url,
+      customer_name, phone, address, note, instagram,
       items, total, payment_method,
     } = await request.json();
 
@@ -27,12 +27,19 @@ export async function POST(request) {
       unitPrice: Number(it.unitPrice),
     }));
 
+    // Instagram-ыг тэмдэглэлд оруулна
+    let finalNote = note || "";
+    if (instagram) {
+      const igClean = instagram.startsWith("@") ? instagram : `@${instagram}`;
+      finalNote = `📷 Instagram: ${igClean}${finalNote ? `\n${finalNote}` : ""}`;
+    }
+
     const { data: order, error: orderErr } = await admin.from("orders").insert({
       order_code,
       customer_name,
       phone,
-      address: map_url ? `${address}\n📍 ${map_url}` : address,
-      note: note || null,
+      address,
+      note: finalNote || null,
       items: orderItems,
       total: Number(total),
       status: "pending",
