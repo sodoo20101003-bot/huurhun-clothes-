@@ -307,13 +307,13 @@ export default function KassaPage() {
 
       <div className="card flex flex-col overflow-hidden">
         <div className="border-b border-ink/10 p-3 space-y-2">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input type="text" placeholder="🔍 Бараа хайх..." value={search} onChange={(e) => setSearch(e.target.value)} className="input flex-1" />
             <button
               onClick={() => setManualOpen(true)}
-              className="rounded-xl bg-beak text-ink px-4 py-2 text-sm font-bold whitespace-nowrap hover:bg-beak-600 hover:text-cream transition"
+              className="rounded-xl bg-beak text-ink px-4 py-2.5 text-sm font-bold whitespace-nowrap hover:bg-beak-600 hover:text-cream transition shadow-sm"
             >
-              ✋ Гараар
+              ✋ Гараар нэмэх
             </button>
           </div>
 
