@@ -11,6 +11,8 @@ const NAV = [
   { href: "/admin/brands", label: "🏷 Брэнд" },
   { href: "/admin/promotions", label: "Урамшуулал" },
   { href: "/admin/orders", label: "Захиалга" },
+  { href: "/admin/orders/new", label: "📝 Гараар захиалга" },
+  { href: "/admin/kassa-history", label: "📋 Кассын түүх" },
   { href: "/admin/reports", label: "📊 Тайлан" },
   { href: "/admin/users", label: "👥 Хэрэглэгчид" },
   { href: "/admin/chat", label: "💬 Чат" },
@@ -32,12 +34,10 @@ export default async function AdminLayout({ children }) {
       <div className="grid gap-4 md:grid-cols-[200px_1fr]">
         <aside className="space-y-1">
           {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
+            <Link key={n.href} href={n.href}
               className={`block rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-cream transition ${
                 n.href === "/kassa" ? "bg-beak text-ink mt-3" : ""
-              }`}
+              } ${n.href === "/admin/orders/new" ? "bg-green-50 text-green-700 border border-green-200" : ""}`}
             >
               {n.label}
             </Link>
