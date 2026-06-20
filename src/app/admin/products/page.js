@@ -59,6 +59,26 @@ export default function AdminProducts() {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
+  // Variants-ийг өнгөөр бүлэглэж, размераар эрэмбэлэх
+  function sortVariants(variants) {
+    // Sizing: тоо бол numeric, текст бол S/M/L/XL дараалал
+    const SIZE_ORDER = { XS: 1, S: 2, M: 3, L: 4, XL: 5, "2XL": 6, "3XL": 7, "4XL": 8 };
+    function sizeKey(s) {
+      if (!s) return 0;
+      if (SIZE_ORDER[s.toUpperCase()]) return SIZE_ORDER[s.toUpperCase()];
+      const n = parseFloat(s);
+      return isNaN(n) ? 1000 : n;
+    }
+    return [...variants].sort((a, b) => {
+      // 1. Өнгөөр (өнгөгүй нь сүүлд)
+      const colorA = a.color || "ZZZ";
+      const colorB = b.color || "ZZZ";
+      if (colorA !== colorB) return colorA.localeCompare(colorB, "mn");
+      // 2. Размераар
+      return sizeKey(a.size) - sizeKey(b.size);
+    });
+  }
+
   const productColors = useMemo(
     () => [...new Set(form.variants.map((v) => v.color).filter(Boolean))],
     [form.variants]
@@ -113,6 +133,7 @@ export default function AdminProducts() {
   }
   const addVariant = () => setForm((f) => ({ ...f, variants: [...f.variants, { size: "", color: "", stock: "" }] }));
   const rmVariant = (i) => setForm((f) => ({ ...f, variants: f.variants.filter((_, x) => x !== i) }));
+  const reorderVariants = () => setForm((f) => ({ ...f, variants: sortVariants(f.variants.filter(v => v.size || v.color)) }));
 
   function addSizeQuick(s) {
     const exists = form.variants.some((v) => v.size === s);
@@ -155,7 +176,10 @@ export default function AdminProducts() {
       gift_note: p.gift_note || "",
     });
     supabase.from("product_variants").select("size,color,stock").eq("product_id", p.id).then(({ data }) => {
-      if (data?.length) setForm((f) => ({ ...f, variants: data }));
+      if (data?.length) {
+        const sorted = sortVariants(data);
+        setForm((f) => ({ ...f, variants: sorted }));
+      }
     });
     setOpen(true);
   }
@@ -180,9 +204,10 @@ export default function AdminProducts() {
       const { data } = await supabase.from("products").insert(payload).select("id").single();
       productId = data.id;
     }
-    const variants = form.variants
-      .filter((v) => v.size || v.color || v.stock)
-      .map((v) => ({ product_id: productId, size: v.size || null, color: v.color || null, stock: Number(v.stock) || 0 }));
+    const variants = sortVariants(
+      form.variants
+        .filter((v) => v.size || v.color || v.stock)
+    ).map((v) => ({ product_id: productId, size: v.size || null, color: v.color || null, stock: Number(v.stock) || 0 }));
     if (variants.length) await supabase.from("product_variants").insert(variants);
     setOpen(false); setForm(empty);
     await load();
@@ -291,7 +316,10 @@ export default function AdminProducts() {
                   </div>
                 ))}
               </div>
-              <button onClick={addVariant} className="mt-3 text-sm font-medium text-beak-600 hover:underline">+ мөр нэмэх</button>
+              <div className="mt-3 flex items-center gap-3">
+                <button onClick={addVariant} className="text-sm font-medium text-beak-600 hover:underline">+ мөр нэмэх</button>
+                <button onClick={reorderVariants} className="text-sm font-medium text-ink-400 hover:text-ink hover:underline">↕ Өнгө/размераар эрэмбэлэх</button>
+              </div>
             </div>
           </div>
 

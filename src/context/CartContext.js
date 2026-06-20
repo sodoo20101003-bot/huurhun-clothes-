@@ -2,21 +2,54 @@
 import { createContext, useContext, useEffect, useState, useMemo } from "react";
 
 const CartContext = createContext(null);
+const STORAGE_KEY = "huurhun_cart_v3";
 
-const STORAGE_KEY = "huurhun_cart_v2";
+// Хосоор тооцоо: product-level pair_price + category-level pair_price
+function computeCartTotal(items) {
+  let total = 0;
+  const byCategory = {};
 
-// === Pair price тооцоо ===
-// Бараа бүрд pair_price байгаа бол, тухайн бараа 2+ ширхэг авбал автомат хямдрана
-function computeLineTotal(item) {
-  const qty = Number(item.qty || 0);
-  const unit = Number(item.unitPrice || 0);
-  const pair = Number(item.pairPrice || 0);
-  if (pair > 0 && qty >= 2) {
-    const pairs = Math.floor(qty / 2);
-    const rest = qty % 2;
-    return pairs * pair + rest * unit;
+  for (const it of items) {
+    const qty = Number(it.qty || 0);
+    const unit = Number(it.unitPrice || 0);
+    const productPair = Number(it.pairPrice || 0);
+    const categoryPair = Number(it.categoryPairPrice || 0);
+    const catId = it.categoryId || null;
+
+    // 1. Барааны өөрийн pair_price
+    if (productPair > 0 && qty >= 2) {
+      const pairs = Math.floor(qty / 2);
+      const rest = qty % 2;
+      total += pairs * productPair;
+      if (rest > 0) {
+        if (categoryPair > 0 && catId) {
+          if (!byCategory[catId]) byCategory[catId] = { units: [], pairPrice: categoryPair };
+          byCategory[catId].units.push(unit);
+        } else total += rest * unit;
+      }
+      continue;
+    }
+
+    // 2. Категорийн pair_price
+    if (categoryPair > 0 && catId) {
+      if (!byCategory[catId]) byCategory[catId] = { units: [], pairPrice: categoryPair };
+      for (let i = 0; i < qty; i++) byCategory[catId].units.push(unit);
+      continue;
+    }
+
+    // 3. Энгийн
+    total += qty * unit;
   }
-  return qty * unit;
+
+  for (const catId of Object.keys(byCategory)) {
+    const { units, pairPrice } = byCategory[catId];
+    units.sort((a, b) => b - a);
+    const pairs = Math.floor(units.length / 2);
+    total += pairs * pairPrice;
+    for (let i = pairs * 2; i < units.length; i++) total += units[i];
+  }
+
+  return total;
 }
 
 export function CartProvider({ children }) {
@@ -27,6 +60,7 @@ export function CartProvider({ children }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setItems(JSON.parse(raw));
+      localStorage.removeItem("huurhun_cart_v2");
     } catch {}
     setReady(true);
   }, []);
@@ -39,12 +73,8 @@ export function CartProvider({ children }) {
 
   function add(item) {
     setItems((prev) => {
-      // Ижил productId + size + color байвал qty нэмнэ
       const idx = prev.findIndex(
-        (x) =>
-          x.productId === item.productId &&
-          x.size === item.size &&
-          x.color === item.color
+        (x) => x.productId === item.productId && x.size === item.size && x.color === item.color
       );
       if (idx >= 0) {
         const next = [...prev];
@@ -64,30 +94,13 @@ export function CartProvider({ children }) {
     });
   }
 
-  function remove(idx) {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
-  }
+  function remove(idx) { setItems((prev) => prev.filter((_, i) => i !== idx)); }
+  function clear() { setItems([]); }
 
-  function clear() {
-    setItems([]);
-  }
-
-  const subtotal = useMemo(
-    () => items.reduce((s, x) => s + Number(x.unitPrice) * Number(x.qty), 0),
-    [items]
-  );
-
-  const total = useMemo(
-    () => items.reduce((s, x) => s + computeLineTotal(x), 0),
-    [items]
-  );
-
+  const subtotal = useMemo(() => items.reduce((s, x) => s + Number(x.unitPrice) * Number(x.qty), 0), [items]);
+  const total = useMemo(() => computeCartTotal(items), [items]);
   const savings = subtotal - total;
-
-  const count = useMemo(
-    () => items.reduce((s, x) => s + Number(x.qty), 0),
-    [items]
-  );
+  const count = useMemo(() => items.reduce((s, x) => s + Number(x.qty), 0), [items]);
 
   return (
     <CartContext.Provider value={{ items, add, updateQty, remove, clear, subtotal, total, savings, count, ready }}>
@@ -102,7 +115,6 @@ export function useCart() {
   return ctx;
 }
 
-// Барааны нэг мөрийн дүнг тооцох (cart page харах зориулалтаар)
 export function lineTotal(item) {
-  return computeLineTotal(item);
+  return computeCartTotal([item]);
 }

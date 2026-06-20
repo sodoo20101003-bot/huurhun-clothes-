@@ -78,6 +78,8 @@ export default function ProductView({ product, variants }) {
       qty,
       unitPrice: unit,
       pairPrice: Number(product.pair_price) || 0,
+      categoryId: product.category_id || null,
+      categoryPairPrice: Number(product.categories?.pair_price) || 0,
     });
     setMsg("Сагсанд нэмэгдлээ ✓");
   }

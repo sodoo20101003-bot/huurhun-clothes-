@@ -20,7 +20,7 @@ function makeOrderTimestamp(dateStr) {
 export async function POST(request) {
   try {
     const {
-      customer_name, phone, address, note, instagram, order_date,
+      customer_name, phone, address, note, instagram, order_date, branch,
       items, total, payment_method,
     } = await request.json();
 
@@ -89,6 +89,7 @@ export async function POST(request) {
         channel: "web",
         payment_method: payment_method || "cash",
         order_code,
+        branch: branch || null,
       };
       if (created_at) salePayload.created_at = created_at;
       await admin.from("sales").insert(salePayload);

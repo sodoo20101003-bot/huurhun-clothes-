@@ -24,7 +24,8 @@ export default function NewOrderPage() {
   const [customer, setCustomer] = useState({
     name: "", phone: "", address: "", note: "", instagram: "",
     payment_method: "qpay", totalOverride: "",
-    order_date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD өнөөдрийн огноо
+    order_date: new Date().toISOString().slice(0, 10),
+    branch: "branch1",
   });
 
   async function load() {
@@ -99,6 +100,7 @@ export default function NewOrderPage() {
         customer_name: customer.name, phone: customer.phone,
         address: customer.address, note: customer.note, instagram: customer.instagram,
         order_date: customer.order_date,
+        branch: customer.branch,
         items: items.map((it) => ({
           productId: it.productId, productName: it.productName,
           size: it.size, color: it.color, qty: it.qty, unitPrice: it.unitPrice,
@@ -135,6 +137,26 @@ export default function NewOrderPage() {
               value={customer.instagram} onChange={(e) => setCustomer({ ...customer, instagram: e.target.value })} />
             <textarea className="input min-h-16" placeholder="💬 Нэмэлт тэмдэглэл"
               value={customer.note} onChange={(e) => setCustomer({ ...customer, note: e.target.value })} />
+          </div>
+
+          <div className="card p-4">
+            <h3 className="font-display font-700 mb-3">🏪 Салбар</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: "branch1", label: "Салбар 1" },
+                { value: "branch2", label: "Салбар 2" },
+              ].map((b) => (
+                <button
+                  key={b.value}
+                  onClick={() => setCustomer({ ...customer, branch: b.value })}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                    customer.branch === b.value ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"
+                  }`}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="card p-4">

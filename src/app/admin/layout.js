@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/orders/new", label: "📝 Гараар захиалга" },
   { href: "/admin/kassa-history", label: "📋 Кассын түүх" },
   { href: "/admin/reports", label: "📊 Тайлан" },
+  { href: "/admin/daily-payments", label: "📅 Өдөр + Төлбөр" },
   { href: "/admin/users", label: "👥 Хэрэглэгчид" },
   { href: "/admin/chat", label: "💬 Чат" },
   { href: "/kassa", label: "💼 Кассаар орох →" },
