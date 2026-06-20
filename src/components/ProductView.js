@@ -77,6 +77,7 @@ export default function ProductView({ product, variants }) {
       color: color || null,
       qty,
       unitPrice: unit,
+      pairPrice: Number(product.pair_price) || 0,
     });
     setMsg("Сагсанд нэмэгдлээ ✓");
   }

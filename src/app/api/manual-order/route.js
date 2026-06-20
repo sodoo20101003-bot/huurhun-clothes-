@@ -3,10 +3,24 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+// "YYYY-MM-DD" → ISO timestamp (тухайн өдрийн одоо цагтай)
+// Хэрэв сонгосон огноо нь өнөөдөр бол яг одоог буцаана,
+// өмнөх өдөр бол тэр өдрийн ижил цагийн утга буцаана
+function makeOrderTimestamp(dateStr) {
+  if (!dateStr) return null;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (dateStr === today) return now.toISOString(); // өнөөдөр → яг одоо
+  // Сонгосон өдөр + одоогийн цаг (UTC хадгалагдана)
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds()));
+  return dt.toISOString();
+}
+
 export async function POST(request) {
   try {
     const {
-      customer_name, phone, address, note, instagram,
+      customer_name, phone, address, note, instagram, order_date,
       items, total, payment_method,
     } = await request.json();
 
@@ -17,6 +31,7 @@ export async function POST(request) {
 
     const admin = createAdminClient();
     const order_code = String(Math.floor(100000 + Math.random() * 900000));
+    const created_at = makeOrderTimestamp(order_date);
 
     const orderItems = items.map((it) => ({
       productId: it.productId || null,
@@ -27,14 +42,13 @@ export async function POST(request) {
       unitPrice: Number(it.unitPrice),
     }));
 
-    // Instagram-ыг тэмдэглэлд оруулна
     let finalNote = note || "";
     if (instagram) {
       const igClean = instagram.startsWith("@") ? instagram : `@${instagram}`;
       finalNote = `📷 Instagram: ${igClean}${finalNote ? `\n${finalNote}` : ""}`;
     }
 
-    const { data: order, error: orderErr } = await admin.from("orders").insert({
+    const orderPayload = {
       order_code,
       customer_name,
       phone,
@@ -45,8 +59,10 @@ export async function POST(request) {
       status: "pending",
       payment_status: "paid",
       status_message: "Гараар оруулсан захиалга",
-    }).select().single();
+    };
+    if (created_at) orderPayload.created_at = created_at;
 
+    const { data: order, error: orderErr } = await admin.from("orders").insert(orderPayload).select().single();
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
 
     for (const it of items) {
@@ -62,7 +78,7 @@ export async function POST(request) {
             .eq("id", v.id);
         }
       }
-      await admin.from("sales").insert({
+      const salePayload = {
         product_id: it.productId || null,
         product_name: it.productName,
         size: it.size || null,
@@ -73,7 +89,9 @@ export async function POST(request) {
         channel: "web",
         payment_method: payment_method || "cash",
         order_code,
-      });
+      };
+      if (created_at) salePayload.created_at = created_at;
+      await admin.from("sales").insert(salePayload);
     }
 
     return NextResponse.json({ ok: true, order_code, order });

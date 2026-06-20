@@ -24,6 +24,7 @@ export default function NewOrderPage() {
   const [customer, setCustomer] = useState({
     name: "", phone: "", address: "", note: "", instagram: "",
     payment_method: "qpay", totalOverride: "",
+    order_date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD өнөөдрийн огноо
   });
 
   async function load() {
@@ -97,6 +98,7 @@ export default function NewOrderPage() {
       body: JSON.stringify({
         customer_name: customer.name, phone: customer.phone,
         address: customer.address, note: customer.note, instagram: customer.instagram,
+        order_date: customer.order_date,
         items: items.map((it) => ({
           productId: it.productId, productName: it.productName,
           size: it.size, color: it.color, qty: it.qty, unitPrice: it.unitPrice,
@@ -133,6 +135,20 @@ export default function NewOrderPage() {
               value={customer.instagram} onChange={(e) => setCustomer({ ...customer, instagram: e.target.value })} />
             <textarea className="input min-h-16" placeholder="💬 Нэмэлт тэмдэглэл"
               value={customer.note} onChange={(e) => setCustomer({ ...customer, note: e.target.value })} />
+          </div>
+
+          <div className="card p-4">
+            <h3 className="font-display font-700 mb-3">📅 Захиалгын огноо</h3>
+            <input
+              type="date"
+              className="input"
+              value={customer.order_date}
+              onChange={(e) => setCustomer({ ...customer, order_date: e.target.value })}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <p className="text-xs text-ink-400 mt-2">
+              💡 Өнгөрсөн өдрийн захиалга оруулж болно (тайланд тэр өдрөөр орно)
+            </p>
           </div>
 
           <div className="card p-4">
