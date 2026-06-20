@@ -1,8 +1,8 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
-import { finalPrice, formatPrice, imagesForColor, lineTotalWithPromo } from "@/lib/utils";
+import { finalPrice, formatPrice, imagesForColor } from "@/lib/utils";
 
 export default function ProductView({ product, variants }) {
   const router = useRouter();
@@ -22,7 +22,6 @@ export default function ProductView({ product, variants }) {
     [variants]
   );
 
-  // Сонгосон өнгөөр зургийг шүүх
   const shownImages = useMemo(
     () => imagesForColor(product.images, color),
     [product.images, color]
@@ -34,19 +33,38 @@ export default function ProductView({ product, variants }) {
       .reduce((sum, v) => sum + Number(v.stock || 0), 0);
   };
 
+  // === Автомат сонгох ===
+  // Эхний өнгө + хамгийн эхний үлдэгдэлтэй размер
+  useEffect(() => {
+    if (!color && colors.length > 0) {
+      setColor(colors[0]);
+    }
+  }, [colors]);
+
+  useEffect(() => {
+    if (!size && sizes.length > 0) {
+      // Үлдэгдэлтэй эхний размер сонгох
+      const firstAvailable = sizes.find((s) => getStock(s, color || colors[0]) > 0);
+      if (firstAvailable) setSize(firstAvailable);
+    }
+  }, [sizes, color]);
+
   const stock = getStock(size, color);
   const needsSize = sizes.length > 0 && !size;
   const needsColor = colors.length > 0 && !color;
   const unit = finalPrice(product.price, product.discount_percent);
+  const totalStock = variants.reduce((s, v) => s + Number(v.stock || 0), 0);
+  const allOut = totalStock === 0;
 
   function pickColor(c) {
     setColor(c);
     setMsg("");
     setQty(1);
-    setActiveImg(0); // өнгө солиход эхний зураг руу буцах
+    setActiveImg(0);
   }
 
   function handleAdd() {
+    if (allOut) return setMsg("Энэ бараа дууссан байна");
     if (needsSize) return setMsg("Хэмжээгээ сонгоно уу");
     if (needsColor) return setMsg("Өнгөө сонгоно уу");
     if (stock < 1) return setMsg("Энэ сонголт дууссан байна");
@@ -59,8 +77,6 @@ export default function ProductView({ product, variants }) {
       color: color || null,
       qty,
       unitPrice: unit,
-      pair_price: Number(product.pair_price) || 0,
-      categoryId: product.category_id || null,
     });
     setMsg("Сагсанд нэмэгдлээ ✓");
   }
@@ -70,15 +86,14 @@ export default function ProductView({ product, variants }) {
   return (
     <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
       {/* ===== ЗҮҮН ТАЛ — ЗУРАГ ===== */}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row mx-auto w-full max-w-[480px] lg:max-w-none">
-        {/* Thumbnails */}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row">
         {list.length > 1 && (
-          <div className="flex flex-row gap-2 sm:flex-col sm:w-[64px] sm:shrink-0 overflow-x-auto">
+          <div className="flex flex-row gap-2 sm:flex-col sm:w-[72px] sm:shrink-0 overflow-x-auto">
             {list.map((img, i) => (
               <button
                 key={i}
                 onClick={() => setActiveImg(i)}
-                className={`aspect-square w-14 sm:w-full shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                className={`aspect-square w-16 sm:w-full shrink-0 overflow-hidden rounded-lg border-2 transition ${
                   activeImg === i ? "border-ink" : "border-transparent hover:border-ink/20"
                 }`}
               >
@@ -92,8 +107,7 @@ export default function ProductView({ product, variants }) {
           </div>
         )}
 
-        {/* Гол зураг */}
-        <div className="flex-1 aspect-square overflow-hidden rounded-xl2 bg-cream max-h-[520px]">
+        <div className="flex-1 aspect-square overflow-hidden rounded-xl2 bg-cream">
           {list[activeImg]?.url ? (
             <img src={list[activeImg].url} alt={product.name} className="h-full w-full object-cover" />
           ) : (
@@ -121,49 +135,16 @@ export default function ProductView({ product, variants }) {
           )}
         </div>
 
-        {/* Ангиллын багц үнэ (ямар ч 2 ширхэг — өөр өөр бараа байж болно) */}
-        {product.categories?.pair_price > 0 && (
-          <div className="mt-4 rounded-xl bg-beak-100 border border-beak/30 p-3 flex items-center gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-beak font-display text-xs font-700 text-ink leading-tight text-center">
-              2 авбал
-            </span>
-            <div>
-              <p className="text-sm font-semibold">
-                {product.categories.name}-ний ямар ч 2 ширхэг = {formatPrice(product.categories.pair_price)}
-              </p>
-              <p className="text-xs text-ink-400">
-                Жишээ: 200,000₮ + 150,000₮-ын барааг хамт авбал {formatPrice(product.categories.pair_price)}.
-                Сагсанд автоматаар тооцогдоно.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Барааны өөрийнх нь pair_price (хэрэв ангилалд байхгүй) */}
-        {!product.categories?.pair_price && Number(product.pair_price) > 0 && (
-          <div className="mt-4 rounded-xl bg-beak-100 border border-beak/30 p-3 flex items-center gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-beak font-display text-xs font-700 text-ink leading-tight text-center">
-              2 авбал
-            </span>
-            <div>
-              <p className="text-sm font-semibold">2 ширхэгийг {formatPrice(product.pair_price)}-аар!</p>
-              <p className="text-xs text-ink-400">
-                <b className="text-beak-600">Хэмнэлт: {formatPrice(unit * 2 - Number(product.pair_price))}</b>
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Бэлгийн тэмдэглэгээ */}
-        {product.gift_note && (
-          <div className="mt-3 rounded-xl bg-green-50 border border-green-300 p-3 flex items-center gap-3">
-            <span className="text-2xl">🎁</span>
-            <p className="text-sm font-semibold text-green-700">{product.gift_note}</p>
-          </div>
-        )}
-
         {product.description && (
           <p className="mt-4 whitespace-pre-line leading-relaxed text-ink-400">{product.description}</p>
+        )}
+
+        {/* Бараа бүгд дууссан үед */}
+        {allOut && (
+          <div className="mt-4 rounded-xl bg-red-50 border border-red-200 p-4">
+            <p className="font-display font-700 text-red-700">📦 Энэ бараа одоогоор бэлэн байхгүй</p>
+            <p className="text-sm text-red-600 mt-1">Удахгүй ачаа орох тул чатаар асууж лавлаарай.</p>
+          </div>
         )}
 
         <div className="mt-6 space-y-6 border-t border-ink/10 pt-6">
@@ -222,33 +203,37 @@ export default function ProductView({ product, variants }) {
           )}
 
           {/* ТОО */}
-          <div className="flex items-center gap-4">
-            <p className="text-sm font-semibold">Тоо:</p>
-            <div className="flex items-center rounded-lg border border-ink/15 overflow-hidden">
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-4 py-2.5 text-lg hover:bg-cream transition">−</button>
-              <span className="w-10 text-center font-semibold">{qty}</span>
-              <button onClick={() => setQty((q) => Math.min(q + 1, stock > 0 ? stock : 99))} className="px-4 py-2.5 text-lg hover:bg-cream transition">+</button>
+          {!allOut && (
+            <div className="flex items-center gap-4">
+              <p className="text-sm font-semibold">Тоо:</p>
+              <div className="flex items-center rounded-lg border border-ink/15 overflow-hidden">
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-4 py-2.5 text-lg hover:bg-cream transition">−</button>
+                <span className="w-10 text-center font-semibold">{qty}</span>
+                <button onClick={() => setQty((q) => Math.min(q + 1, stock > 0 ? stock : 99))} className="px-4 py-2.5 text-lg hover:bg-cream transition">+</button>
+              </div>
+              {(size || color) && stock > 0 && stock <= 3 && (
+                <span className="text-sm text-beak-600 font-semibold">Үлдэгдэл: {stock}</span>
+              )}
             </div>
-            {(size || color) && stock > 0 && <span className="text-sm text-ink-400">Үлдэгдэл: {stock}</span>}
-          </div>
+          )}
 
           {/* ТОВЧНУУД */}
           <div className="space-y-3 pt-2">
-            {(() => {
-              const previewTotal = lineTotalWithPromo({ qty, unitPrice: unit, pair_price: Number(product.pair_price) || 0 });
-              const savings = unit * qty - previewTotal;
-              return (
-                <button onClick={handleAdd} className="w-full rounded-full bg-ink py-4 text-base font-semibold text-cream transition hover:bg-ink-600 active:scale-[.98]">
-                  <span>Сагсанд нэмэх — {formatPrice(previewTotal)}</span>
-                  {savings > 0 && (
-                    <span className="ml-2 text-xs font-bold text-beak">(-{formatPrice(savings)})</span>
-                  )}
-                </button>
-              );
-            })()}
-            <button onClick={() => { handleAdd(); if (!needsSize && !needsColor && stock >= qty) router.push("/checkout"); }} className="w-full rounded-full border-2 border-ink/15 bg-paper py-4 text-base font-semibold transition hover:border-ink/40 active:scale-[.98]">
-              Шууд авах
+            <button
+              onClick={handleAdd}
+              disabled={allOut}
+              className="w-full rounded-full bg-ink py-4 text-base font-semibold text-cream transition hover:bg-ink-600 active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {allOut ? "📦 Дууссан" : `Сагсанд нэмэх — ${formatPrice(unit * qty)}`}
             </button>
+            {!allOut && (
+              <button
+                onClick={() => { handleAdd(); if (!needsSize && !needsColor && stock >= qty) router.push("/checkout"); }}
+                className="w-full rounded-full border-2 border-ink/15 bg-paper py-4 text-base font-semibold transition hover:border-ink/40 active:scale-[.98]"
+              >
+                Шууд авах
+              </button>
+            )}
           </div>
 
           {msg && (
