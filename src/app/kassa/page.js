@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice, finalPrice, firstImageUrl } from "@/lib/utils";
+import { formatPrice, finalPrice, firstImageUrl, imagesForColor } from "@/lib/utils";
 
 const PAY_OPTIONS = [
   { value: "cash", label: "💵 Бэлэн" },
@@ -25,6 +25,7 @@ export default function KassaPage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
   const [pickProduct, setPickProduct] = useState(null);
+  const [pickColor, setPickColor] = useState(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState({ name: "", price: "", qty: 1, categoryId: "" });
   const [manualBusy, setManualBusy] = useState(false);
@@ -401,35 +402,81 @@ export default function KassaPage() {
         </div>
       </div>
 
-      {pickProduct && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => setPickProduct(null)}>
-          <div className="card w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-display font-700">{pickProduct.name}</p>
-              <button onClick={() => setPickProduct(null)} className="text-2xl text-ink-400">×</button>
-            </div>
-            {firstImageUrl(pickProduct.images) && (
-              <img src={firstImageUrl(pickProduct.images)} alt="" className="h-40 w-full object-cover rounded-lg mb-3" />
-            )}
-            <p className="text-sm font-display font-700 mb-3">
-              Үнэ: <span className="text-beak-600">{formatPrice(finalPrice(pickProduct.price, pickProduct.discount_percent))}</span>
-            </p>
-            <p className="text-xs font-semibold text-ink-400 mb-2">Хэмжээ / Өнгө:</p>
-            <div className="space-y-1.5">
-              {pickProduct._variants.filter((v) => v.stock > 0).map((v, i) => (
-                <button key={i} onClick={() => addToCart(pickProduct, v)}
-                  className="flex w-full items-center justify-between rounded-lg border border-ink/15 bg-cream/30 p-3 hover:bg-beak-100 hover:border-beak transition">
-                  <span className="font-semibold">{[v.size, v.color].filter(Boolean).join(" / ") || "—"}</span>
-                  <span className="text-xs text-ink-400">📦 {v.stock} үлдсэн</span>
-                </button>
-              ))}
-              {pickProduct._variants.filter((v) => v.stock > 0).length === 0 && (
-                <p className="text-center text-sm text-red-500 p-4">Бүгд дууссан</p>
+      {pickProduct && (() => {
+        const variantsInStock = pickProduct._variants.filter((v) => v.stock > 0);
+        // Variants бүлэглэх — өнгөөр
+        const colorMap = {};
+        for (const v of variantsInStock) {
+          const key = v.color || "—";
+          if (!colorMap[key]) colorMap[key] = [];
+          colorMap[key].push(v);
+        }
+        const colors = Object.keys(colorMap);
+        // Идэвхтэй өнгөтэй variant-ууд
+        const activeColor = pickColor || colors[0] || null;
+        const displayVariants = activeColor && colorMap[activeColor] ? colorMap[activeColor] : variantsInStock;
+        // Идэвхтэй өнгөтэй тохирох зураг
+        const matchedImages = imagesForColor(pickProduct.images, activeColor);
+        const shownImage = matchedImages?.[0]?.url || firstImageUrl(pickProduct.images);
+
+        return (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => { setPickProduct(null); setPickColor(null); }}>
+            <div className="card w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-display font-700">{pickProduct.name}</p>
+                <button onClick={() => { setPickProduct(null); setPickColor(null); }} className="text-2xl text-ink-400">×</button>
+              </div>
+
+              {shownImage && (
+                <img src={shownImage} alt="" className="h-48 w-full object-cover rounded-lg mb-3 transition" />
               )}
+
+              <p className="text-sm font-display font-700 mb-3">
+                Үнэ: <span className="text-beak-600">{formatPrice(finalPrice(pickProduct.price, pickProduct.discount_percent))}</span>
+              </p>
+
+              {/* Өнгө сонгох chip-үүд */}
+              {colors.length > 1 && (
+                <>
+                  <p className="text-xs font-semibold text-ink-400 mb-2">🎨 Өнгө сонгох:</p>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {colors.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setPickColor(c)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold border transition ${
+                          activeColor === c
+                            ? "bg-ink text-cream border-ink"
+                            : "bg-paper border-ink/15 hover:border-ink/40"
+                        }`}
+                      >
+                        {c} <span className="opacity-60">({colorMap[c].length})</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <p className="text-xs font-semibold text-ink-400 mb-2">📏 Хэмжээ сонгох:</p>
+              <div className="space-y-1.5">
+                {displayVariants.map((v, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { addToCart(pickProduct, v); setPickColor(null); }}
+                    className="flex w-full items-center justify-between rounded-lg border border-ink/15 bg-cream/30 p-3 hover:bg-beak-100 hover:border-beak transition"
+                  >
+                    <span className="font-semibold">{[v.size, v.color].filter(Boolean).join(" / ") || "—"}</span>
+                    <span className="text-xs text-ink-400">📦 {v.stock} үлдсэн</span>
+                  </button>
+                ))}
+                {variantsInStock.length === 0 && (
+                  <p className="text-center text-sm text-red-500 p-4">Бүгд дууссан</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ============ ✋ ГАРААР БАРАА ОРУУЛАХ MODAL ============ */}
       {manualOpen && (
