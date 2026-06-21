@@ -39,6 +39,23 @@ export default function NewOrderPage() {
       if (!vbp[x.product_id]) vbp[x.product_id] = [];
       vbp[x.product_id].push(x);
     }
+    // Эрэмбэлэх: өнгөөр → размераар
+    const SIZE_ORDER = { XS: 1, S: 2, M: 3, L: 4, XL: 5, "2XL": 6, "3XL": 7, "4XL": 8 };
+    const sizeKey = (s) => {
+      if (!s) return 0;
+      const upper = String(s).toUpperCase();
+      if (SIZE_ORDER[upper]) return SIZE_ORDER[upper];
+      const n = parseFloat(s);
+      return isNaN(n) ? 1000 : n;
+    };
+    for (const pid of Object.keys(vbp)) {
+      vbp[pid].sort((a, b) => {
+        const cA = a.color || "ZZZ";
+        const cB = b.color || "ZZZ";
+        if (cA !== cB) return cA.localeCompare(cB, "mn");
+        return sizeKey(a.size) - sizeKey(b.size);
+      });
+    }
     setProducts((p || []).map((pr) => ({
       ...pr, _variants: vbp[pr.id] || [],
       _totalStock: (vbp[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0), 0),
