@@ -11,6 +11,7 @@ const PAY_OPTIONS = [
   { value: "card", label: "💳 Карт" },
   { value: "transfer", label: "🏦 Дансаар" },
   { value: "pocket", label: "📱 Pocket" },
+  { value: "storepay", label: "🛍 StorePay" },
 ];
 
 export default function NewOrderPage() {

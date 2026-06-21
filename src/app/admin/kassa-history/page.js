@@ -30,8 +30,10 @@ export default function KassaHistoryPage() {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState(null);
+  const [deletingCode, setDeletingCode] = useState(null);
 
-  useEffect(() => {
+  function loadData() {
+    setLoading(true);
     supabase
       .from("sales")
       .select("*")
@@ -42,7 +44,31 @@ export default function KassaHistoryPage() {
         setSales(data || []);
         setLoading(false);
       });
-  }, []);
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  async function deleteTransaction(order_code, total) {
+    const password = prompt(
+      `⚠️ Уг зарагдалтыг бүхэлд нь УСТГАХ уу?\n\n` +
+      `Код: #${order_code}\n` +
+      `Нийт: ${total}₮\n\n` +
+      `Үлдэгдэл буцаагдана.\n\n` +
+      `Админ нууц үг оруулна уу:`
+    );
+    if (!password) return;
+    setDeletingCode(order_code);
+    const res = await fetch("/api/kassa-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_code, password }),
+    });
+    const data = await res.json();
+    setDeletingCode(null);
+    if (!res.ok) return alert(data.error || "Алдаа");
+    alert(`✅ Устгагдсан\n${data.deleted_count} мөр устсан\n${data.restored_qty} ширхэг үлдэгдэлд буцсан`);
+    loadData();
+  }
 
   if (loading) return <p className="text-ink-400">Ачаалж байна...</p>;
 
@@ -132,7 +158,19 @@ export default function KassaHistoryPage() {
                             </span>
                             <span className="text-xs text-ink-400">#{tx.order_code || "—"}</span>
                           </div>
-                          <p className="font-display font-700 text-beak-600">{formatPrice(tx.total)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-display font-700 text-beak-600">{formatPrice(tx.total)}</p>
+                            {tx.order_code && (
+                              <button
+                                onClick={() => deleteTransaction(tx.order_code, tx.total)}
+                                disabled={deletingCode === tx.order_code}
+                                className="ml-1 grid h-7 w-7 place-items-center rounded-md text-red-500 hover:bg-red-50 transition disabled:opacity-30"
+                                title="Зарагдалтыг бүхэлд нь устгах"
+                              >
+                                {deletingCode === tx.order_code ? "…" : "🗑"}
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="space-y-1 mb-2">

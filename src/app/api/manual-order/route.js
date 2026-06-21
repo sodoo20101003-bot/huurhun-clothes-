@@ -43,9 +43,10 @@ export async function POST(request) {
     }));
 
     let finalNote = note || "";
+    let igHandle = null;
     if (instagram) {
-      const igClean = instagram.startsWith("@") ? instagram : `@${instagram}`;
-      finalNote = `📷 Instagram: ${igClean}${finalNote ? `\n${finalNote}` : ""}`;
+      igHandle = instagram.startsWith("@") ? instagram : `@${instagram}`;
+      finalNote = `📷 Instagram: ${igHandle}${finalNote ? `\n${finalNote}` : ""}`;
     }
 
     const orderPayload = {
@@ -54,10 +55,11 @@ export async function POST(request) {
       phone,
       address,
       note: finalNote || null,
+      instagram: igHandle, // ← тусдаа баганд
       items: orderItems,
       total: Number(total),
       status: "pending",
-      payment_status: "paid",
+      payment_status: "paid", // ← гараар оруулсан = шууд төлсөн
       status_message: "Гараар оруулсан захиалга",
     };
     if (created_at) orderPayload.created_at = created_at;
