@@ -12,7 +12,7 @@ const COMMON_COLORS = ["Хар", "Цагаан", "Саарал", "Хүрэн", "
 const empty = {
   id: null, name: "", description: "", price: "", discount_percent: 0,
   category_id: "", brand_id: "", images: [],
-  variants: [{ size: "", color: "", stock: "" }],
+  variants: [{ size: "", color: "", stock: "", stock_branch2: "" }],
   pair_price: "",
   gift_note: "",
 };
@@ -39,7 +39,7 @@ export default function AdminProducts() {
       supabase.from("categories").select("id,name").order("sort"),
       supabase.from("brands").select("id,name,logo_url").order("sort").order("name"),
       supabase.from("products").select("*, categories(name), brands(name,logo_url)").order("created_at", { ascending: false }),
-      supabase.from("product_variants").select("product_id,size,color,stock"),
+      supabase.from("product_variants").select("product_id,size,color,stock,stock_branch2"),
     ]);
     setCats(c || []);
     setBrands(br || []);
@@ -51,7 +51,9 @@ export default function AdminProducts() {
     const productsWithVariants = (p || []).map((pr) => ({
       ...pr,
       _variants: variantsByProduct[pr.id] || [],
-      _totalStock: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0), 0),
+      _stock1: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0), 0),
+      _stock2: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock_branch2 || 0), 0),
+      _totalStock: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0) + Number(vv.stock_branch2 || 0), 0),
     }));
     setProducts(productsWithVariants);
   }
@@ -131,7 +133,7 @@ export default function AdminProducts() {
       return { ...f, variants };
     });
   }
-  const addVariant = () => setForm((f) => ({ ...f, variants: [...f.variants, { size: "", color: "", stock: "" }] }));
+  const addVariant = () => setForm((f) => ({ ...f, variants: [...f.variants, { size: "", color: "", stock: "", stock_branch2: "" }] }));
   const rmVariant = (i) => setForm((f) => ({ ...f, variants: f.variants.filter((_, x) => x !== i) }));
   const reorderVariants = () => setForm((f) => ({ ...f, variants: sortVariants(f.variants.filter(v => v.size || v.color)) }));
 
@@ -140,7 +142,7 @@ export default function AdminProducts() {
     if (exists) return;
     const hasEmpty = form.variants.length === 1 && !form.variants[0].size && !form.variants[0].color;
     if (hasEmpty) setVariant(0, "size", s);
-    else setForm((f) => ({ ...f, variants: [...f.variants, { size: s, color: "", stock: "" }] }));
+    else setForm((f) => ({ ...f, variants: [...f.variants, { size: s, color: "", stock: "", stock_branch2: "" }] }));
   }
 
   async function uploadImgs(files) {
@@ -175,7 +177,7 @@ export default function AdminProducts() {
       pair_price: p.pair_price || "",
       gift_note: p.gift_note || "",
     });
-    supabase.from("product_variants").select("size,color,stock").eq("product_id", p.id).then(({ data }) => {
+    supabase.from("product_variants").select("size,color,stock,stock_branch2").eq("product_id", p.id).then(({ data }) => {
       if (data?.length) {
         const sorted = sortVariants(data);
         setForm((f) => ({ ...f, variants: sorted }));
@@ -206,8 +208,14 @@ export default function AdminProducts() {
     }
     const variants = sortVariants(
       form.variants
-        .filter((v) => v.size || v.color || v.stock)
-    ).map((v) => ({ product_id: productId, size: v.size || null, color: v.color || null, stock: Number(v.stock) || 0 }));
+        .filter((v) => v.size || v.color || v.stock || v.stock_branch2)
+    ).map((v) => ({
+      product_id: productId,
+      size: v.size || null,
+      color: v.color || null,
+      stock: Number(v.stock) || 0,
+      stock_branch2: Number(v.stock_branch2) || 0,
+    }));
     if (variants.length) await supabase.from("product_variants").insert(variants);
     setOpen(false); setForm(empty);
     await load();
@@ -303,15 +311,16 @@ export default function AdminProducts() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <div className="grid grid-cols-[1fr_1fr_90px_36px] gap-2 text-xs font-semibold text-ink-400 px-1 mb-1 min-w-[340px]">
-                <span>Хэмжээ</span><span>Өнгө</span><span>Тоо</span><span></span>
+              <div className="grid grid-cols-[1fr_1fr_70px_70px_36px] gap-2 text-xs font-semibold text-ink-400 px-1 mb-1 min-w-[380px]">
+                <span>Хэмжээ</span><span>Өнгө</span><span className="text-center">🏪 С1</span><span className="text-center">🏪 С2</span><span></span>
               </div>
-              <div className="space-y-2 min-w-[340px]">
+              <div className="space-y-2 min-w-[380px]">
                 {form.variants.map((v, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_90px_36px] gap-2 items-start">
+                  <div key={i} className="grid grid-cols-[1fr_1fr_70px_70px_36px] gap-2 items-start">
                     <input className="input !py-2.5 !rounded-lg" placeholder="40, M" value={v.size} onChange={(e) => setVariant(i, "size", e.target.value)} />
                     <input className="input !py-2.5 !rounded-lg" placeholder="Хар" value={v.color} onChange={(e) => setVariant(i, "color", e.target.value)} />
                     <input className="input !py-2.5 !rounded-lg text-center" type="number" placeholder="0" value={v.stock} onChange={(e) => setVariant(i, "stock", e.target.value)} />
+                    <input className="input !py-2.5 !rounded-lg text-center" type="number" placeholder="0" value={v.stock_branch2 || ""} onChange={(e) => setVariant(i, "stock_branch2", e.target.value)} />
                     <button onClick={() => rmVariant(i)} className="grid h-10 w-9 place-items-center rounded-lg text-red-400 hover:bg-red-50">✕</button>
                   </div>
                 ))}
@@ -379,7 +388,7 @@ export default function AdminProducts() {
                   {p.categories?.name || "—"} · {formatPrice(finalPrice(p.price, p.discount_percent))}
                   {" · "}
                   <span className={`font-semibold ${p._totalStock === 0 ? "text-red-500" : p._totalStock < 5 ? "text-beak-600" : "text-green-600"}`}>
-                    📦 {p._totalStock} үлдсэн
+                    📦 {p._totalStock} ({p._stock1}+{p._stock2})
                   </span>
                 </p>
               </div>
@@ -395,14 +404,16 @@ export default function AdminProducts() {
             {p._variants?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5 pl-[68px]">
                 {p._variants.map((v, i) => {
-                  const stock = Number(v.stock || 0);
+                  const stock1 = Number(v.stock || 0);
+                  const stock2 = Number(v.stock_branch2 || 0);
+                  const total = stock1 + stock2;
                   return (
                     <span key={i} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      stock === 0 ? "bg-red-50 text-red-600 border border-red-200" :
-                      stock < 5 ? "bg-beak-100 text-beak-600 border border-beak/30" :
+                      total === 0 ? "bg-red-50 text-red-600 border border-red-200" :
+                      total < 5 ? "bg-beak-100 text-beak-600 border border-beak/30" :
                       "bg-green-50 text-green-700 border border-green-200"
                     }`}>
-                      {[v.size, v.color].filter(Boolean).join(" / ") || "—"}: {stock}
+                      {[v.size, v.color].filter(Boolean).join(" / ") || "—"}: <b>{stock1}</b> | <b>{stock2}</b>
                     </span>
                   );
                 })}

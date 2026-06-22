@@ -6,6 +6,7 @@ import SignOut from "../profile/SignOut";
 const NAV = [
   { href: "/admin", label: "Хянах самбар" },
   { href: "/admin/products", label: "Бараа" },
+  { href: "/admin/inventory-branches", label: "🏪 Салбар үлдэгдэл" },
   { href: "/admin/restock-history", label: "📥 Ачааны түүх" },
   { href: "/admin/categories", label: "🗂 Ангилал" },
   { href: "/admin/brands", label: "🏷 Брэнд" },
