@@ -32,6 +32,7 @@ export default function AdminProducts() {
   const [restockVariantIdx, setRestockVariantIdx] = useState(0);
   const [restockQty, setRestockQty] = useState("10");
   const [restockNote, setRestockNote] = useState("");
+  const [restockBranch, setRestockBranch] = useState("branch1");
   const [restockBusy, setRestockBusy] = useState(false);
 
   async function load() {
@@ -116,6 +117,7 @@ export default function AdminProducts() {
         color: variant.color || null,
         qty,
         note: restockNote || null,
+        branch: restockBranch,
       }),
     });
     const data = await res.json();
@@ -434,11 +436,33 @@ export default function AdminProducts() {
             </div>
             <p className="text-sm font-semibold mb-3">{restockProduct.name}</p>
 
+            {/* САЛБАР СОНГОХ */}
+            <p className="text-xs font-semibold text-ink-400 mb-2">🏪 Аль салбарт ачаа орсон бэ?</p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {[
+                { v: "branch1", l: "🏪 Салбар 1" },
+                { v: "branch2", l: "🏪 Салбар 2" },
+              ].map((b) => (
+                <button
+                  key={b.v}
+                  onClick={() => setRestockBranch(b.v)}
+                  className={`rounded-lg border-2 px-3 py-2.5 text-sm font-bold transition ${
+                    restockBranch === b.v
+                      ? "bg-ink text-cream border-ink"
+                      : "bg-paper border-ink/15 hover:border-ink/40"
+                  }`}
+                >
+                  {b.l}
+                </button>
+              ))}
+            </div>
+
             <p className="text-xs font-semibold text-ink-400 mb-2">Аль хэмжээ/өнгөнд ачаа орсон бэ?</p>
             <div className="space-y-1 max-h-72 overflow-y-auto mb-3 border border-ink/10 rounded-lg p-2 bg-cream/30">
               {restockProduct._variants.map((v, i) => {
                 const label = [v.size, v.color].filter(Boolean).join(" / ") || "—";
                 const isSelected = restockVariantIdx === i;
+                const branchStock = restockBranch === "branch1" ? Number(v.stock || 0) : Number(v.stock_branch2 || 0);
                 return (
                   <button
                     key={i}
@@ -451,7 +475,7 @@ export default function AdminProducts() {
                   >
                     <span>{label}</span>
                     <span className={`text-xs ${isSelected ? "text-cream/70" : "text-ink-400"}`}>
-                      📦 одоо {v.stock} ширхэг
+                      📦 {restockBranch === "branch1" ? "С1" : "С2"}: {branchStock}
                     </span>
                   </button>
                 );
@@ -484,7 +508,7 @@ export default function AdminProducts() {
 
             <div className="flex gap-2 mt-5">
               <button onClick={submitRestock} disabled={restockBusy} className="btn-primary flex-1">
-                {restockBusy ? "Нэмж..." : "✓ Ачаа оруулах"}
+                {restockBusy ? "Нэмж..." : `✓ ${restockBranch === "branch1" ? "Салбар 1" : "Салбар 2"}-д ачаа оруулах`}
               </button>
               <button onClick={() => setRestockProduct(null)} disabled={restockBusy} className="btn-ghost">Болих</button>
             </div>
