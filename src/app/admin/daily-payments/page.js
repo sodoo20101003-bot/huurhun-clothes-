@@ -112,49 +112,76 @@ export default function DailyPaymentsPage() {
           <p>Өгөгдөл алга байна</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {days.map((d) => {
             const dayData = byDay[d];
             const date = new Date(d);
             const weekday = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"][date.getDay()];
+            const autoTotal = dayData.total - dayData.manualTotal;
+            const autoQty = dayData.qty - dayData.manualQty;
             return (
-              <div key={d} className="card p-4">
-                <div className="flex items-center justify-between mb-3 pb-3 border-b border-ink/10">
+              <div key={d} className="card overflow-hidden">
+                {/* Толгой */}
+                <div className="bg-ink text-cream p-4 flex items-center justify-between">
                   <div>
-                    <p className="font-display font-700 text-lg">{d}</p>
-                    <p className="text-xs text-ink-400">{weekday} · {dayData.count} гүйлгээ</p>
-                    {dayData.manualCount > 0 && (
-                      <p className="text-xs text-beak-600 font-semibold mt-0.5">
-                        📝 Гараар: {dayData.manualCount} ({dayData.manualQty} ш · {formatPrice(dayData.manualTotal)})
-                      </p>
-                    )}
+                    <p className="font-display font-700 text-xl">{d}</p>
+                    <p className="text-xs opacity-70">{weekday} гараг · {dayData.count} гүйлгээ</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-display font-700 text-xl text-beak-600">{formatPrice(dayData.total)}</p>
-                    <p className="text-xs text-ink-400">{dayData.qty} ширхэг</p>
+                    <p className="font-display font-700 text-2xl">{formatPrice(dayData.total)}</p>
+                    <p className="text-xs opacity-70">{dayData.qty} ширхэг зарагдсан</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {Object.entries(dayData.payments)
-                    .sort((a, b) => b[1].total - a[1].total)
-                    .map(([pm, d]) => {
-                      const pct = (d.total / dayData.total) * 100;
-                      return (
-                        <div key={pm} className="rounded-lg bg-cream/50 p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-semibold">{payLabel(pm)}</span>
-                            <span className="text-xs text-ink-400">{pct.toFixed(0)}%</span>
+
+                {/* Автомат/Гараар хуваалт */}
+                {dayData.manualCount > 0 && (
+                  <div className="grid grid-cols-2 divide-x divide-ink/10 bg-cream/30 border-b border-ink/10">
+                    <div className="p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-ink-400 mb-1">
+                        <span>🤖</span>
+                        <span className="font-semibold">Автомат (POS + Веб)</span>
+                      </div>
+                      <p className="font-display font-700 text-green-700">{formatPrice(autoTotal)}</p>
+                      <p className="text-xs text-ink-400">{autoQty} ш · {dayData.count - dayData.manualCount} гүйлгээ</p>
+                    </div>
+                    <div className="p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-ink-400 mb-1">
+                        <span>📝</span>
+                        <span className="font-semibold">Гараар оруулсан</span>
+                      </div>
+                      <p className="font-display font-700 text-beak-600">{formatPrice(dayData.manualTotal)}</p>
+                      <p className="text-xs text-ink-400">{dayData.manualQty} ш · {dayData.manualCount} гүйлгээ</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Төлбөрийн төрлүүд */}
+                <div className="p-4">
+                  <p className="text-xs font-semibold text-ink-400 mb-3 uppercase tracking-wider">Төлбөрийн төрлөөр</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(dayData.payments)
+                      .sort((a, b) => b[1].total - a[1].total)
+                      .map(([pm, dd]) => {
+                        const pct = (dd.total / dayData.total) * 100;
+                        return (
+                          <div key={pm} className="rounded-xl border border-ink/10 bg-paper p-3 hover:border-beak transition">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-semibold">{payLabel(pm)}</p>
+                                <p className="text-xs text-ink-400 mt-0.5">{dd.qty} ширхэг</p>
+                              </div>
+                              <span className="rounded-full bg-beak-100 text-beak-600 px-2 py-0.5 text-[10px] font-bold">
+                                {pct.toFixed(0)}%
+                              </span>
+                            </div>
+                            <p className="font-display font-700 text-lg">{formatPrice(dd.total)}</p>
+                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
+                              <div className="h-full bg-beak transition-all" style={{ width: `${pct}%` }} />
+                            </div>
                           </div>
-                          <div className="flex items-baseline justify-between">
-                            <span className="text-xs text-ink-400">{d.qty} ширхэг</span>
-                            <span className="font-display font-700 text-sm">{formatPrice(d.total)}</span>
-                          </div>
-                          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-ink/5">
-                            <div className="h-full bg-beak" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
             );
