@@ -233,14 +233,15 @@ export default function KassaPage() {
   }
 
   return (
-    <div className="grid h-[calc(100vh-100px)] grid-cols-1 lg:grid-cols-[420px_1fr] gap-3">
-      <div className="card flex flex-col overflow-hidden">
-        <div className="bg-ink text-cream p-3 flex items-center justify-between">
+    <div className="grid lg:h-[calc(100vh-100px)] grid-cols-1 lg:grid-cols-[420px_1fr] gap-3">
+      <div className="card flex flex-col lg:overflow-hidden h-[80vh] lg:h-auto">
+        <div className="bg-ink text-cream p-3 flex items-center justify-between shrink-0">
           <p className="font-display font-700">💼 Касс / POS</p>
           <p className="text-xs opacity-70">{new Date().toLocaleDateString("mn-MN")}</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        {/* САГС — scroll болно */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
           {cart.length === 0 ? (
             <div className="grid h-full place-items-center text-ink-400 text-sm">
               <div className="text-center"><div className="text-4xl mb-2">🛍</div><p>Бараа сонгож нэмнэ үү →</p></div>
@@ -264,57 +265,61 @@ export default function KassaPage() {
           ))}
         </div>
 
-        <div className="border-t border-ink/10 bg-cream/50 p-3 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-400">Барааны үнэ</span>
-            <span className={energyTotal !== rawTotal ? "line-through text-ink-400" : ""}>{formatPrice(energyTotal)}</span>
-          </div>
-          {energyTotal !== rawTotal && (
-            <div className="flex justify-between text-sm text-green-700">
-              <span>🎁 1+1 урамшуулал автомат</span>
-              <span>{formatPrice(rawTotal)}</span>
+        {/* ДООРХ ХЭСЭГ — fixed, түр scrollable summary */}
+        <div className="shrink-0 max-h-[55vh] overflow-y-auto">
+          <div className="border-t border-ink/10 bg-cream/50 p-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-400">Барааны үнэ</span>
+              <span className={energyTotal !== rawTotal ? "line-through text-ink-400" : ""}>{formatPrice(energyTotal)}</span>
             </div>
-          )}
-          <div className="flex justify-between text-sm items-center">
-            <span className="text-ink-400">Тусгай үнэ</span>
-            <input type="number" placeholder={String(rawTotal)} value={totalOverride} onChange={(e) => setTotalOverride(e.target.value)}
-              className="w-32 rounded-md border border-ink/15 bg-paper px-2 py-1 text-right text-sm outline-none focus:border-beak" />
-          </div>
-          <div className="flex justify-between font-display font-700 text-lg border-t border-ink/10 pt-2">
-            <span>НИЙТ</span><span className="text-beak-600">{formatPrice(finalTotal)}</span>
-          </div>
-        </div>
-
-        <div className="border-t border-ink/10 p-3">
-          <p className="text-xs font-semibold text-ink-400 mb-1.5">🏪 Салбар</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {BRANCH_OPTIONS.map((b) => (
-              <button key={b.value} onClick={() => setBranch(b.value)}
-                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${branch === b.value ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"}`}>{b.label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-ink/10 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-ink-400">💳 Төлбөр (холимог байж болно)</p>
-            <p className={`text-xs font-bold ${Math.abs(remaining) > 1 ? "text-red-500" : "text-green-600"}`}>
-              {remaining > 0 ? `Үлдсэн: ${formatPrice(remaining)}` : remaining < 0 ? `Илүү: ${formatPrice(-remaining)}` : "✓ Тэнцсэн"}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            {PAY_OPTIONS.map((p) => (
-              <div key={p.value} className="flex items-center gap-2">
-                <span className="text-xs w-24">{p.label}</span>
-                <input type="number" value={payments[p.value] || ""} onChange={(e) => setPayment(p.value, e.target.value)} placeholder="0"
-                  className="flex-1 rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-beak" />
-                <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100">Бүх</button>
+            {energyTotal !== rawTotal && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span>🎁 1+1 урамшуулал автомат</span>
+                <span>{formatPrice(rawTotal)}</span>
               </div>
-            ))}
+            )}
+            <div className="flex justify-between text-sm items-center">
+              <span className="text-ink-400">Тусгай үнэ</span>
+              <input type="number" placeholder={String(rawTotal)} value={totalOverride} onChange={(e) => setTotalOverride(e.target.value)}
+                className="w-32 rounded-md border border-ink/15 bg-paper px-2 py-1 text-right text-sm outline-none focus:border-beak" />
+            </div>
+            <div className="flex justify-between font-display font-700 text-lg border-t border-ink/10 pt-2">
+              <span>НИЙТ</span><span className="text-beak-600">{formatPrice(finalTotal)}</span>
+            </div>
+          </div>
+
+          <div className="border-t border-ink/10 p-3">
+            <p className="text-xs font-semibold text-ink-400 mb-1.5">🏪 Салбар</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {BRANCH_OPTIONS.map((b) => (
+                <button key={b.value} onClick={() => setBranch(b.value)}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${branch === b.value ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"}`}>{b.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-ink/10 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-ink-400">💳 Төлбөр</p>
+              <p className={`text-xs font-bold ${Math.abs(remaining) > 1 ? "text-red-500" : "text-green-600"}`}>
+                {remaining > 0 ? `Үлдсэн: ${formatPrice(remaining)}` : remaining < 0 ? `Илүү: ${formatPrice(-remaining)}` : "✓ Тэнцсэн"}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              {PAY_OPTIONS.map((p) => (
+                <div key={p.value} className="flex items-center gap-2">
+                  <span className="text-xs w-24">{p.label}</span>
+                  <input type="number" value={payments[p.value] || ""} onChange={(e) => setPayment(p.value, e.target.value)} placeholder="0"
+                    className="flex-1 rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-beak" />
+                  <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100">Бүх</button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_2fr] gap-2 p-3 bg-paper border-t border-ink/10">
+        {/* ДУУСГАХ — ҮРГЭЛЖ ХАРАГДАНА (sticky bottom) */}
+        <div className="grid grid-cols-[1fr_2fr] gap-2 p-3 bg-paper border-t-2 border-ink/20 shrink-0 sticky bottom-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           <button onClick={clearCart} className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-100">🗑 Цэвэрлэх</button>
           <button onClick={complete} disabled={busy || cart.length === 0}
             className="rounded-xl bg-green-600 text-white px-3 py-3 text-sm font-bold hover:bg-green-700 disabled:opacity-50">
