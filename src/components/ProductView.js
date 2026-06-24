@@ -13,14 +13,23 @@ export default function ProductView({ product, variants }) {
   const [msg, setMsg] = useState("");
   const [activeImg, setActiveImg] = useState(0);
 
-  const sizes = useMemo(
-    () => [...new Set(variants.map((v) => v.size).filter(Boolean))],
-    [variants]
-  );
-  const colors = useMemo(
-    () => [...new Set(variants.map((v) => v.color).filter(Boolean))],
-    [variants]
-  );
+  const SIZE_ORDER = { XS: 1, S: 2, M: 3, L: 4, XL: 5, "2XL": 6, "3XL": 7, "4XL": 8 };
+  const sizeKey = (s) => {
+    if (!s) return 0;
+    const upper = String(s).toUpperCase();
+    if (SIZE_ORDER[upper]) return SIZE_ORDER[upper];
+    const n = parseFloat(s);
+    return isNaN(n) ? 1000 : n;
+  };
+
+  const sizes = useMemo(() => {
+    const unique = [...new Set(variants.map((v) => v.size).filter(Boolean))];
+    return unique.sort((a, b) => sizeKey(a) - sizeKey(b));
+  }, [variants]);
+  const colors = useMemo(() => {
+    const unique = [...new Set(variants.map((v) => v.color).filter(Boolean))];
+    return unique.sort((a, b) => a.localeCompare(b, "mn"));
+  }, [variants]);
 
   const shownImages = useMemo(
     () => imagesForColor(product.images, color),

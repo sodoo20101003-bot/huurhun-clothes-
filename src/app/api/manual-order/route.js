@@ -55,12 +55,13 @@ export async function POST(request) {
       phone,
       address,
       note: finalNote || null,
-      instagram: igHandle, // ← тусдаа баганд
+      instagram: igHandle,
       items: orderItems,
       total: Number(total),
       status: "pending",
-      payment_status: "paid", // ← гараар оруулсан = шууд төлсөн
+      payment_status: "paid",
       status_message: "Гараар оруулсан захиалга",
+      is_manual: true,
     };
     if (created_at) orderPayload.created_at = created_at;
 
@@ -92,6 +93,7 @@ export async function POST(request) {
         payment_method: payment_method || "cash",
         order_code,
         branch: branch || null,
+        is_manual: true,
       };
       if (created_at) salePayload.created_at = created_at;
       await admin.from("sales").insert(salePayload);

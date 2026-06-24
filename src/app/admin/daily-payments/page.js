@@ -49,7 +49,7 @@ export default function DailyPaymentsPage() {
   const byDay = {};
   for (const s of filtered) {
     const d = dayKey(s.created_at);
-    if (!byDay[d]) byDay[d] = { payments: {}, total: 0, qty: 0, count: 0 };
+    if (!byDay[d]) byDay[d] = { payments: {}, total: 0, qty: 0, count: 0, manualTotal: 0, manualQty: 0, manualCount: 0 };
     let pm = s.payment_method || "other";
     if (typeof pm === "string" && pm.startsWith("mixed:")) pm = "mixed";
     if (!byDay[d].payments[pm]) byDay[d].payments[pm] = { qty: 0, total: 0 };
@@ -58,6 +58,11 @@ export default function DailyPaymentsPage() {
     byDay[d].total += Number(s.total || 0);
     byDay[d].qty += Number(s.qty || 0);
     byDay[d].count++;
+    if (s.is_manual) {
+      byDay[d].manualTotal += Number(s.total || 0);
+      byDay[d].manualQty += Number(s.qty || 0);
+      byDay[d].manualCount++;
+    }
   }
   const days = Object.keys(byDay).sort().reverse();
 
@@ -118,6 +123,11 @@ export default function DailyPaymentsPage() {
                   <div>
                     <p className="font-display font-700 text-lg">{d}</p>
                     <p className="text-xs text-ink-400">{weekday} · {dayData.count} гүйлгээ</p>
+                    {dayData.manualCount > 0 && (
+                      <p className="text-xs text-beak-600 font-semibold mt-0.5">
+                        📝 Гараар: {dayData.manualCount} ({dayData.manualQty} ш · {formatPrice(dayData.manualTotal)})
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-display font-700 text-xl text-beak-600">{formatPrice(dayData.total)}</p>
