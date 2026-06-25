@@ -298,6 +298,12 @@ export default function KassaPage() {
         <div className="bg-ink text-cream p-3 flex items-center justify-between shrink-0">
           <p className="font-display font-700">💼 Касс / POS</p>
           <div className="flex items-center gap-2">
+            <a
+              href="/kassa/manual-order"
+              className="rounded-full bg-beak text-ink hover:bg-beak-600 hover:text-cream px-3 py-1 text-xs font-bold transition"
+            >
+              📝 Гараар захиалга
+            </a>
             <button
               onClick={openHistory}
               className="rounded-full bg-cream/20 hover:bg-cream/30 px-3 py-1 text-xs font-bold transition"
