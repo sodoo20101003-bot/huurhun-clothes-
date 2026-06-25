@@ -4,11 +4,11 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice, finalPrice, firstImageUrl, imagesForColor } from "@/lib/utils";
 
 const PAY_OPTIONS = [
-  { value: "cash", label: "💵 Бэлэн" },
-  { value: "card", label: "💳 Карт" },
-  { value: "pocket", label: "📱 Pocket" },
-  { value: "storepay", label: "🛍 StorePay" },
-  { value: "dans", label: "💰 Данс" },
+  { value: "cash", label: "Бэлэн" },
+  { value: "card", label: "Карт" },
+  { value: "pocket", label: "Pocket" },
+  { value: "storepay", label: "StorePay" },
+  { value: "dans", label: "Данс" },
 ];
 const BRANCH_OPTIONS = [
   { value: "branch1", label: "Салбар 1" },
@@ -382,7 +382,7 @@ export default function KassaPage() {
             <div className="space-y-1.5">
               {PAY_OPTIONS.map((p) => (
                 <div key={p.value} className="flex items-center gap-2">
-                  <span className="text-xs w-24">{p.label}</span>
+                  <span className="text-sm font-semibold w-24 shrink-0 text-ink">{p.label}</span>
                   <input type="number" value={payments[p.value] || ""} onChange={(e) => setPayment(p.value, e.target.value)} placeholder="0"
                     className="flex-1 rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-beak" />
                   <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100">Бүх</button>

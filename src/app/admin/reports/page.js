@@ -19,6 +19,7 @@ const PAY_LABELS = {
 };
 function payLabel(m) {
   if (!m) return "Бусад";
+  if (typeof m === "string" && m.startsWith("mixed:")) return "Холимог";
   const key = String(m).toLowerCase();
   for (const k of Object.keys(PAY_LABELS)) {
     if (key.includes(k)) return PAY_LABELS[k];
