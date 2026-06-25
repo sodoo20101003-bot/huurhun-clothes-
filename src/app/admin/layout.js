@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOut from "../profile/SignOut";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const NAV = [
   { href: "/admin", label: "Хянах самбар" },
   { href: "/admin/products", label: "Бараа" },
