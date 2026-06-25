@@ -49,12 +49,23 @@ export default function DailyPaymentsPage() {
   const byDay = {};
   for (const s of filtered) {
     const d = dayKey(s.created_at);
-    if (!byDay[d]) byDay[d] = { payments: {}, total: 0, qty: 0, count: 0, manualTotal: 0, manualQty: 0, manualCount: 0 };
+    if (!byDay[d]) byDay[d] = {
+      payments: {}, autoPayments: {}, manualPayments: {},
+      total: 0, qty: 0, count: 0,
+      manualTotal: 0, manualQty: 0, manualCount: 0,
+    };
     let pm = s.payment_method || "other";
     if (typeof pm === "string" && pm.startsWith("mixed:")) pm = "mixed";
+    // Combined
     if (!byDay[d].payments[pm]) byDay[d].payments[pm] = { qty: 0, total: 0 };
     byDay[d].payments[pm].qty += Number(s.qty || 0);
     byDay[d].payments[pm].total += Number(s.total || 0);
+    // Separate auto vs manual
+    const bucket = s.is_manual ? "manualPayments" : "autoPayments";
+    if (!byDay[d][bucket][pm]) byDay[d][bucket][pm] = { qty: 0, total: 0 };
+    byDay[d][bucket][pm].qty += Number(s.qty || 0);
+    byDay[d][bucket][pm].total += Number(s.total || 0);
+    // Totals
     byDay[d].total += Number(s.total || 0);
     byDay[d].qty += Number(s.qty || 0);
     byDay[d].count++;
@@ -155,34 +166,71 @@ export default function DailyPaymentsPage() {
                   </div>
                 )}
 
-                {/* Төлбөрийн төрлүүд */}
-                <div className="p-4">
-                  <p className="text-xs font-semibold text-ink-400 mb-3 uppercase tracking-wider">Төлбөрийн төрлөөр</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(dayData.payments)
-                      .sort((a, b) => b[1].total - a[1].total)
-                      .map(([pm, dd]) => {
-                        const pct = (dd.total / dayData.total) * 100;
-                        return (
-                          <div key={pm} className="rounded-xl border border-ink/10 bg-paper p-3 hover:border-beak transition">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="text-sm font-semibold">{payLabel(pm)}</p>
-                                <p className="text-xs text-ink-400 mt-0.5">{dd.qty} ширхэг</p>
+                {/* Автомат төлбөрийн төрлүүд */}
+                {Object.keys(dayData.autoPayments).length > 0 && (
+                  <div className="p-4 border-b border-ink/5">
+                    <p className="text-xs font-semibold text-green-700 mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🤖</span> Автомат төлбөр (POS + Веб)
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {Object.entries(dayData.autoPayments)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .map(([pm, dd]) => {
+                          const pct = (dd.total / (dayData.total - dayData.manualTotal || 1)) * 100;
+                          return (
+                            <div key={pm} className="rounded-xl border border-green-200 bg-green-50/30 p-3">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="text-sm font-semibold">{payLabel(pm)}</p>
+                                  <p className="text-xs text-ink-400 mt-0.5">{dd.qty} ширхэг</p>
+                                </div>
+                                <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-[10px] font-bold">
+                                  {pct.toFixed(0)}%
+                                </span>
                               </div>
-                              <span className="rounded-full bg-beak-100 text-beak-600 px-2 py-0.5 text-[10px] font-bold">
-                                {pct.toFixed(0)}%
-                              </span>
+                              <p className="font-display font-700 text-lg">{formatPrice(dd.total)}</p>
+                              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
+                                <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                              </div>
                             </div>
-                            <p className="font-display font-700 text-lg">{formatPrice(dd.total)}</p>
-                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
-                              <div className="h-full bg-beak transition-all" style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Гараар оруулсан төлбөрийн төрлүүд */}
+                {Object.keys(dayData.manualPayments).length > 0 && (
+                  <div className="p-4 bg-beak-100/20">
+                    <p className="text-xs font-semibold text-beak-600 mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>📝</span> Гараар оруулсан төлбөр
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {Object.entries(dayData.manualPayments)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .map(([pm, dd]) => {
+                          const pct = (dd.total / (dayData.manualTotal || 1)) * 100;
+                          return (
+                            <div key={pm} className="rounded-xl border border-beak/30 bg-paper p-3">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="text-sm font-semibold">{payLabel(pm)}</p>
+                                  <p className="text-xs text-ink-400 mt-0.5">{dd.qty} ширхэг</p>
+                                </div>
+                                <span className="rounded-full bg-beak text-ink px-2 py-0.5 text-[10px] font-bold">
+                                  {pct.toFixed(0)}%
+                                </span>
+                              </div>
+                              <p className="font-display font-700 text-lg">{formatPrice(dd.total)}</p>
+                              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
+                                <div className="h-full bg-beak transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
