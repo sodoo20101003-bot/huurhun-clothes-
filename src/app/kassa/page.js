@@ -8,7 +8,7 @@ const PAY_OPTIONS = [
   { value: "card", label: "💳 Карт" },
   { value: "pocket", label: "📱 Pocket" },
   { value: "storepay", label: "🛍 StorePay" },
-  { value: "dans", label: "🏦 Данс" },
+  { value: "dans", label: "💰 Данс" },
 ];
 const BRANCH_OPTIONS = [
   { value: "branch1", label: "Салбар 1" },
