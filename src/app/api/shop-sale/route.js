@@ -3,49 +3,52 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-// Дэлгүүрээс зарагдсан барааг бүртгэх
-// Body: { productId, productName, size, color, qty, unitPrice, paymentMethod, branch }
+// ⚠️ Хуучин API — branch-aware болгосон (stock = stock_branch1 + stock_branch2)
 export async function POST(request) {
   try {
-    const { productId, productName, size, color, qty, unitPrice, paymentMethod, branch } = await request.json();
-
-    if (!productName || !qty) {
-      return NextResponse.json({ error: "Мэдээлэл дутуу" }, { status: 400 });
-    }
+    const { productId, productName, size, color, qty, paymentMethod, branch } = await request.json();
+    if (!productId || !qty) return NextResponse.json({ error: "productId, qty заавал" }, { status: 400 });
 
     const admin = createAdminClient();
+    const targetBranch = branch === "branch2" ? "branch2" : "branch1";
 
-    // 1. Үлдэгдэл шалгах + хасах
-    if (productId) {
-      let q = admin.from("product_variants").select("id,stock").eq("product_id", productId);
-      if (size) q = q.eq("size", size); else q = q.is("size", null);
-      if (color) q = q.eq("color", color); else q = q.is("color", null);
-      const { data: variants } = await q;
-      if (variants?.length) {
-        const v = variants[0];
-        if (Number(qty) > Number(v.stock)) {
-          return NextResponse.json({ error: `Зөвхөн ${v.stock} ширхэг үлдсэн байна` }, { status: 400 });
-        }
-        await admin
-          .from("product_variants")
-          .update({ stock: Number(v.stock) - Number(qty) })
-          .eq("id", v.id);
+    let q = admin.from("product_variants").select("id,stock_branch1,stock_branch2").eq("product_id", productId);
+    if (size) q = q.eq("size", size); else q = q.is("size", null);
+    if (color) q = q.eq("color", color); else q = q.is("color", null);
+    const { data: variants } = await q;
+    if (variants?.length) {
+      const v = variants[0];
+      const s1 = Number(v.stock_branch1 || 0);
+      const s2 = Number(v.stock_branch2 || 0);
+      const total = s1 + s2;
+      if (Number(qty) > total)
+        return NextResponse.json({ error: `Зөвхөн ${total} ширхэг үлдсэн байна` }, { status: 400 });
+
+      let newS1 = s1, newS2 = s2;
+      const n = Number(qty);
+      if (targetBranch === "branch1") {
+        if (n <= s1) newS1 = s1 - n;
+        else { newS1 = 0; newS2 = s2 - (n - s1); }
+      } else {
+        if (n <= s2) newS2 = s2 - n;
+        else { newS2 = 0; newS1 = s1 - (n - s2); }
       }
+      await admin.from("product_variants")
+        .update({ stock_branch1: newS1, stock_branch2: newS2, stock: newS1 + newS2 })
+        .eq("id", v.id);
     }
 
-    // 2. Борлуулалтын дэвтэрт бичих
     await admin.from("sales").insert({
-      product_id: productId || null,
+      product_id: productId,
       product_name: productName,
       size: size || null,
       color: color || null,
       qty: Number(qty),
-      unit_price: Number(unitPrice || 0),
-      total: Number(unitPrice || 0) * Number(qty),
+      unit_price: 0,
+      total: 0,
       channel: "shop",
       payment_method: paymentMethod || "cash",
       branch: branch || null,
-      order_code: null,
     });
 
     return NextResponse.json({ ok: true });
