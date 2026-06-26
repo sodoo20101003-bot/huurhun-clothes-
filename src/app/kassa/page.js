@@ -320,11 +320,11 @@ export default function KassaPage() {
           </div>
         </div>
 
-        {/* САГС — scroll болно */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
+        {/* САГС — scroll болно (хамгийн их зай эзлэхгүй) */}
+        <div className="overflow-y-auto p-2 space-y-2 min-h-[80px] max-h-[28vh] lg:max-h-[35vh] shrink-0 border-b border-ink/10">
           {cart.length === 0 ? (
-            <div className="grid h-full place-items-center text-ink-400 text-sm">
-              <div className="text-center"><div className="text-4xl mb-2">🛍</div><p>Бараа сонгож нэмнэ үү →</p></div>
+            <div className="grid h-full place-items-center text-ink-400 text-sm py-6">
+              <div className="text-center"><div className="text-3xl mb-1">🛍</div><p>Бараа сонгож нэмнэ үү →</p></div>
             </div>
           ) : cart.map((it, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg bg-cream/50 p-2">
@@ -345,9 +345,9 @@ export default function KassaPage() {
           ))}
         </div>
 
-        {/* ДООРХ ХЭСЭГ — fixed, түр scrollable summary */}
-        <div className="shrink-0 max-h-[55vh] overflow-y-auto">
-          <div className="border-t border-ink/10 bg-cream/50 p-3 space-y-2">
+        {/* ДООРХ ХЭСЭГ — бүтэн харагдана, шаардлагатай бол scroll */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="bg-cream/50 p-3 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-ink-400">Барааны үнэ</span>
               <span className={energyTotal !== rawTotal ? "line-through text-ink-400" : ""}>{formatPrice(energyTotal)}</span>
@@ -391,7 +391,7 @@ export default function KassaPage() {
                   <span className="text-sm font-semibold w-24 shrink-0 text-ink">{p.label}</span>
                   <input type="number" value={payments[p.value] || ""} onChange={(e) => setPayment(p.value, e.target.value)} placeholder="0"
                     className="flex-1 rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-beak" />
-                  <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100">Бүх</button>
+                  <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100 shrink-0">Бүх</button>
                 </div>
               ))}
             </div>
