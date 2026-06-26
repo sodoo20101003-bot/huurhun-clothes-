@@ -12,7 +12,7 @@ const COMMON_COLORS = ["Хар", "Цагаан", "Саарал", "Хүрэн", "
 const empty = {
   id: null, name: "", description: "", price: "", discount_percent: 0,
   category_id: "", brand_id: "", images: [],
-  variants: [{ size: "", color: "", stock: "", stock_branch2: "" }],
+  variants: [{ size: "", color: "", stock_branch1: "", stock_branch2: "" }],
   pair_price: "",
   gift_note: "",
 };
@@ -40,7 +40,7 @@ export default function AdminProducts() {
       supabase.from("categories").select("id,name").order("sort"),
       supabase.from("brands").select("id,name,logo_url").order("sort").order("name"),
       supabase.from("products").select("*, categories(name), brands(name,logo_url)").order("created_at", { ascending: false }),
-      supabase.from("product_variants").select("product_id,size,color,stock,stock_branch2"),
+      supabase.from("product_variants").select("product_id,size,color,stock_branch1,stock_branch2"),
     ]);
     setCats(c || []);
     setBrands(br || []);
@@ -52,9 +52,9 @@ export default function AdminProducts() {
     const productsWithVariants = (p || []).map((pr) => ({
       ...pr,
       _variants: variantsByProduct[pr.id] || [],
-      _stock1: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0), 0),
+      _stock1: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock_branch1 || 0), 0),
       _stock2: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock_branch2 || 0), 0),
-      _totalStock: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0) + Number(vv.stock_branch2 || 0), 0),
+      _totalStock: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock_branch1 || 0) + Number(vv.stock_branch2 || 0), 0),
     }));
     setProducts(productsWithVariants);
   }
@@ -135,7 +135,7 @@ export default function AdminProducts() {
       return { ...f, variants };
     });
   }
-  const addVariant = () => setForm((f) => ({ ...f, variants: [...f.variants, { size: "", color: "", stock: "", stock_branch2: "" }] }));
+  const addVariant = () => setForm((f) => ({ ...f, variants: [...f.variants, { size: "", color: "", stock_branch1: "", stock_branch2: "" }] }));
   const rmVariant = (i) => setForm((f) => ({ ...f, variants: f.variants.filter((_, x) => x !== i) }));
   const reorderVariants = () => setForm((f) => ({ ...f, variants: sortVariants(f.variants.filter(v => v.size || v.color)) }));
 
@@ -144,7 +144,7 @@ export default function AdminProducts() {
     if (exists) return;
     const hasEmpty = form.variants.length === 1 && !form.variants[0].size && !form.variants[0].color;
     if (hasEmpty) setVariant(0, "size", s);
-    else setForm((f) => ({ ...f, variants: [...f.variants, { size: s, color: "", stock: "", stock_branch2: "" }] }));
+    else setForm((f) => ({ ...f, variants: [...f.variants, { size: s, color: "", stock_branch1: "", stock_branch2: "" }] }));
   }
 
   async function uploadImgs(files) {
@@ -175,11 +175,11 @@ export default function AdminProducts() {
       category_id: p.category_id || "",
       brand_id: p.brand_id || "",
       images: normalizeImages(p.images),
-      variants: [{ size: "", color: "", stock: "" }],
+      variants: [{ size: "", color: "", stock_branch1: "", stock_branch2: "" }],
       pair_price: p.pair_price || "",
       gift_note: p.gift_note || "",
     });
-    supabase.from("product_variants").select("size,color,stock,stock_branch2").eq("product_id", p.id).then(({ data }) => {
+    supabase.from("product_variants").select("size,color,stock_branch1,stock_branch2").eq("product_id", p.id).then(({ data }) => {
       if (data?.length) {
         const sorted = sortVariants(data);
         setForm((f) => ({ ...f, variants: sorted }));
@@ -210,14 +210,19 @@ export default function AdminProducts() {
     }
     const variants = sortVariants(
       form.variants
-        .filter((v) => v.size || v.color || v.stock || v.stock_branch2)
-    ).map((v) => ({
-      product_id: productId,
-      size: v.size || null,
-      color: v.color || null,
-      stock: Number(v.stock) || 0,
-      stock_branch2: Number(v.stock_branch2) || 0,
-    }));
+        .filter((v) => v.size || v.color || v.stock_branch1 || v.stock_branch2)
+    ).map((v) => {
+      const s1 = Number(v.stock_branch1) || 0;
+      const s2 = Number(v.stock_branch2) || 0;
+      return {
+        product_id: productId,
+        size: v.size || null,
+        color: v.color || null,
+        stock_branch1: s1,
+        stock_branch2: s2,
+        stock: s1 + s2,
+      };
+    });
     if (variants.length) await supabase.from("product_variants").insert(variants);
     setOpen(false); setForm(empty);
     await load();
@@ -321,7 +326,7 @@ export default function AdminProducts() {
                   <div key={i} className="grid grid-cols-[1fr_1fr_70px_70px_36px] gap-2 items-start">
                     <input className="input !py-2.5 !rounded-lg" placeholder="40, M" value={v.size} onChange={(e) => setVariant(i, "size", e.target.value)} />
                     <input className="input !py-2.5 !rounded-lg" placeholder="Хар" value={v.color} onChange={(e) => setVariant(i, "color", e.target.value)} />
-                    <input className="input !py-2.5 !rounded-lg text-center" type="number" placeholder="0" value={v.stock} onChange={(e) => setVariant(i, "stock", e.target.value)} />
+                    <input className="input !py-2.5 !rounded-lg text-center" type="number" placeholder="0" value={v.stock_branch1 || ""} onChange={(e) => setVariant(i, "stock_branch1", e.target.value)} />
                     <input className="input !py-2.5 !rounded-lg text-center" type="number" placeholder="0" value={v.stock_branch2 || ""} onChange={(e) => setVariant(i, "stock_branch2", e.target.value)} />
                     <button onClick={() => rmVariant(i)} className="grid h-10 w-9 place-items-center rounded-lg text-red-400 hover:bg-red-50">✕</button>
                   </div>
@@ -406,7 +411,7 @@ export default function AdminProducts() {
             {p._variants?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5 pl-[68px]">
                 {p._variants.map((v, i) => {
-                  const stock1 = Number(v.stock || 0);
+                  const stock1 = Number(v.stock_branch1 || 0);
                   const stock2 = Number(v.stock_branch2 || 0);
                   const total = stock1 + stock2;
                   return (
@@ -462,7 +467,7 @@ export default function AdminProducts() {
               {restockProduct._variants.map((v, i) => {
                 const label = [v.size, v.color].filter(Boolean).join(" / ") || "—";
                 const isSelected = restockVariantIdx === i;
-                const branchStock = restockBranch === "branch1" ? Number(v.stock || 0) : Number(v.stock_branch2 || 0);
+                const branchStock = restockBranch === "branch1" ? Number(v.stock_branch1 || 0) : Number(v.stock_branch2 || 0);
                 return (
                   <button
                     key={i}
