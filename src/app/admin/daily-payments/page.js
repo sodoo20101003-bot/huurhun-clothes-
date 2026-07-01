@@ -6,7 +6,7 @@ import { formatPrice } from "@/lib/utils";
 const PAY_LABELS = {
   cash: "Бэлэн", card: "Карт", pocket: "Pocket",
   storepay: "StorePay", dans: "Данс", transfer: "Шилжүүлэг",
-  qpay: "QPay",
+  qpay: "QPay", mixed: "🔀 Холимог",
 };
 const BRANCH_LABELS = { branch1: "Салбар 1", branch2: "Салбар 2" };
 const payLabel = (m) => (!m ? "Бусад" : PAY_LABELS[m] || m);
@@ -14,32 +14,6 @@ const payLabel = (m) => (!m ? "Бусад" : PAY_LABELS[m] || m);
 function dayKey(d) {
   const date = new Date(d);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function flattenSales(sales) {
-  const result = [];
-  for (const s of sales) {
-    const pm = s.payment_method;
-    if (typeof pm === "string" && pm.startsWith("mixed:") && Array.isArray(s.payments) && s.payments.length > 0) {
-      // payments нь БҮХ ГҮЙЛГЭЭНИЙ дүн (бүх мөрт адил)
-      // Тиймээс мөрийн дүнг харьцаагаар хуваарилна: row_total * (payment_amount / total_paid)
-      const paymentsSum = s.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      const saleTotal = Number(s.total || 0);
-      const ratio = paymentsSum > 0 ? saleTotal / paymentsSum : 1;
-      const sorted = [...s.payments].sort((a, b) => Number(b.amount) - Number(a.amount));
-      sorted.forEach((p, idx) => {
-        result.push({
-          ...s, payment_method: p.method,
-          total: Math.round(Number(p.amount || 0) * ratio),
-          _aggregateQty: idx === 0 ? Number(s.qty || 0) : 0,
-          _origQty: Number(s.qty || 0), _split: true,
-        });
-      });
-    } else {
-      result.push({ ...s, _aggregateQty: Number(s.qty || 0), _origQty: Number(s.qty || 0) });
-    }
-  }
-  return result;
 }
 
 export default function DailyPaymentsPage() {
@@ -63,36 +37,43 @@ export default function DailyPaymentsPage() {
   if (loading) return <p className="text-ink-400">Ачаалж байна...</p>;
 
   const filtered = activeBranch === "all" ? sales : sales.filter((s) => s.branch === activeBranch);
-  const flattened = flattenSales(filtered);
 
+  // Хосолсон гүйлгээг задлахгүй, "mixed" ангилалд оруулаад дотоод breakdown-той харуулна
   const byDay = {};
-  for (const s of flattened) {
+  for (const s of filtered) {
     const d = dayKey(s.created_at);
     if (!byDay[d]) byDay[d] = {
       branches: {}, total: 0, qty: 0, count: 0,
       manualTotal: 0, manualQty: 0, manualCount: 0,
     };
     const branch = s.branch || "branch1";
-    if (!byDay[d].branches[branch]) byDay[d].branches[branch] = { payments: {} };
+    if (!byDay[d].branches[branch]) byDay[d].branches[branch] = { payments: {}, mixedBreakdown: {} };
     const pm = s.payment_method || "other";
-    if (!byDay[d].branches[branch].payments[pm]) {
-      byDay[d].branches[branch].payments[pm] = { qty: 0, total: 0, items: [] };
+    const isMixed = typeof pm === "string" && pm.startsWith("mixed:");
+    const bucket = isMixed ? "mixed" : pm;
+    if (!byDay[d].branches[branch].payments[bucket]) {
+      byDay[d].branches[branch].payments[bucket] = { qty: 0, total: 0, items: [] };
     }
-    byDay[d].branches[branch].payments[pm].qty += s._aggregateQty;
-    byDay[d].branches[branch].payments[pm].total += Number(s.total || 0);
-    byDay[d].branches[branch].payments[pm].items.push(s);
-  }
-  for (const s of filtered) {
-    const d = dayKey(s.created_at);
-    if (byDay[d]) {
-      byDay[d].total += Number(s.total || 0);
-      byDay[d].qty += Number(s.qty || 0);
-      byDay[d].count++;
-      if (s.is_manual) {
-        byDay[d].manualTotal += Number(s.total || 0);
-        byDay[d].manualQty += Number(s.qty || 0);
-        byDay[d].manualCount++;
+    byDay[d].branches[branch].payments[bucket].qty += Number(s.qty || 0);
+    byDay[d].branches[branch].payments[bucket].total += Number(s.total || 0);
+    byDay[d].branches[branch].payments[bucket].items.push(s);
+    if (isMixed && Array.isArray(s.payments)) {
+      const paymentsSum = s.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const itemTotal = Number(s.total || 0);
+      const ratio = paymentsSum > 0 ? itemTotal / paymentsSum : 0;
+      for (const p of s.payments) {
+        const portion = Math.round(Number(p.amount || 0) * ratio);
+        if (!byDay[d].branches[branch].mixedBreakdown[p.method]) byDay[d].branches[branch].mixedBreakdown[p.method] = 0;
+        byDay[d].branches[branch].mixedBreakdown[p.method] += portion;
       }
+    }
+    byDay[d].total += Number(s.total || 0);
+    byDay[d].qty += Number(s.qty || 0);
+    byDay[d].count++;
+    if (s.is_manual) {
+      byDay[d].manualTotal += Number(s.total || 0);
+      byDay[d].manualQty += Number(s.qty || 0);
+      byDay[d].manualCount++;
     }
   }
 
@@ -101,7 +82,7 @@ export default function DailyPaymentsPage() {
   const grandQty = filtered.reduce((s, x) => s + Number(x.qty || 0), 0);
   const toggle = (k) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
 
-  function PaymentCard({ pm, data, branchTotal, expandKey }) {
+  function PaymentCard({ pm, data, branchTotal, expandKey, mixedBreakdown }) {
     const pct = branchTotal > 0 ? (data.total / branchTotal) * 100 : 0;
     const isOpen = expanded[expandKey];
     return (
@@ -116,7 +97,7 @@ export default function DailyPaymentsPage() {
           </div>
           <div className="flex items-center justify-between">
             <p className="font-display font-700 text-lg">{formatPrice(data.total)}</p>
-            <span className="text-ink-400 text-xs">{isOpen ? "▲ Хаах" : "▼ Бараа харах"}</span>
+            <span className="text-ink-400 text-xs">{isOpen ? "▲ Хаах" : "▼ Дэлгэрэнгүй"}</span>
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
             <div className="h-full bg-beak transition-all" style={{ width: `${pct}%` }} />
@@ -124,6 +105,21 @@ export default function DailyPaymentsPage() {
         </button>
         {isOpen && (
           <div className="border-t border-ink/10 bg-cream/30 p-3 space-y-1.5">
+            {pm === "mixed" && mixedBreakdown && Object.keys(mixedBreakdown).length > 0 && (
+              <div className="mb-2 p-2 rounded-lg bg-beak-100/50 border border-beak/30">
+                <p className="text-[10px] font-bold text-beak-600 uppercase mb-1">Төлбөрийн задаргаа</p>
+                <div className="space-y-0.5">
+                  {Object.entries(mixedBreakdown)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([method, amount]) => (
+                      <div key={method} className="flex justify-between text-xs">
+                        <span className="text-ink">{payLabel(method)}</span>
+                        <span className="font-bold text-beak-600">{formatPrice(amount)}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
             {data.items.length === 0 ? (
               <p className="text-xs text-ink-400 text-center">Бараа байхгүй</p>
             ) : data.items.map((it, i) => (
@@ -133,14 +129,9 @@ export default function DailyPaymentsPage() {
                   {(it.size || it.color) && (
                     <p className="text-ink-400 text-[10px]">{[it.size, it.color].filter(Boolean).join(" / ")}</p>
                   )}
-                  {it._split && (
-                    <span className="inline-block mt-0.5 rounded-full bg-beak-100 text-beak-600 px-1.5 py-0.5 text-[9px] font-semibold">
-                      ⚡ Хосолсон гүйлгээ
-                    </span>
-                  )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-ink-400">×{it._origQty}</p>
+                  <p className="text-ink-400">×{it.qty}</p>
                   <p className="font-semibold">{formatPrice(it.total)}</p>
                 </div>
               </div>
@@ -170,7 +161,7 @@ export default function DailyPaymentsPage() {
             .sort((a, b) => b[1].total - a[1].total)
             .map(([pm, data]) => (
               <PaymentCard key={pm} pm={pm} data={data} branchTotal={branchTotal}
-                expandKey={`${branch}_${pm}_${branchTotal}`} />
+                expandKey={`${branch}_${pm}_${branchTotal}`} mixedBreakdown={branchData.mixedBreakdown} />
             ))}
         </div>
       </div>

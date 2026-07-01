@@ -7,7 +7,7 @@ import Link from "next/link";
 const PAY_LABELS = {
   cash: "Бэлэн", card: "Карт", pocket: "Pocket",
   storepay: "StorePay", dans: "Данс", transfer: "Шилжүүлэг",
-  qpay: "QPay",
+  qpay: "QPay", mixed: "🔀 Холимог",
 };
 const BRANCH_LABELS = { branch1: "Салбар 1", branch2: "Салбар 2" };
 const payLabel = (m) => (!m ? "Бусад" : PAY_LABELS[m] || m);
@@ -30,33 +30,6 @@ function paymentSummary(s) {
       .join(" + ");
   }
   return payLabel(pm);
-}
-
-function flattenSales(sales) {
-  const result = [];
-  for (const s of sales) {
-    const pm = s.payment_method;
-    if (typeof pm === "string" && pm.startsWith("mixed:") && Array.isArray(s.payments) && s.payments.length > 0) {
-      // Sale row-н total нь нийт төлбөрийн ямар хувь эзэлж байгааг тооцно (proportional)
-      // Учир нь sale row бүрт payments бүтнээр хадгалагддаг тул давхардал үүсэхээс сэргийлнэ
-      const paymentsSum = s.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      const saleTotal = Number(s.total || 0);
-      const ratio = paymentsSum > 0 ? saleTotal / paymentsSum : 1;
-
-      const sorted = [...s.payments].sort((a, b) => Number(b.amount) - Number(a.amount));
-      sorted.forEach((p, idx) => {
-        result.push({
-          ...s, payment_method: p.method,
-          total: Math.round(Number(p.amount || 0) * ratio),
-          _aggregateQty: idx === 0 ? Number(s.qty || 0) : 0,
-          _origQty: Number(s.qty || 0), _split: true,
-        });
-      });
-    } else {
-      result.push({ ...s, _aggregateQty: Number(s.qty || 0), _origQty: Number(s.qty || 0) });
-    }
-  }
-  return result;
 }
 
 export default function KassaReportPage() {
@@ -112,18 +85,34 @@ export default function KassaReportPage() {
     byDayTx[d].manualTxCount = Object.values(byDayTx[d].transactions).filter(t => t.is_manual).length;
   }
 
-  const flattened = flattenSales(filtered);
+  // Payment view — өдөр бүрд салбараар ялгаж бүлэглэх (хосолсоныг задлахгүй)
   const byDayPay = {};
-  for (const s of flattened) {
+  for (const s of filtered) {
     const d = dayKey(s.created_at);
     if (!byDayPay[d]) byDayPay[d] = { branches: {} };
     const branch = s.branch || "branch1";
-    if (!byDayPay[d].branches[branch]) byDayPay[d].branches[branch] = { payments: {} };
+    if (!byDayPay[d].branches[branch]) byDayPay[d].branches[branch] = { payments: {}, mixedBreakdown: {} };
     const pm = s.payment_method || "other";
-    if (!byDayPay[d].branches[branch].payments[pm]) byDayPay[d].branches[branch].payments[pm] = { qty: 0, total: 0, items: [] };
-    byDayPay[d].branches[branch].payments[pm].qty += s._aggregateQty;
-    byDayPay[d].branches[branch].payments[pm].total += Number(s.total || 0);
-    byDayPay[d].branches[branch].payments[pm].items.push(s);
+    const isMixed = typeof pm === "string" && pm.startsWith("mixed:");
+    const bucket = isMixed ? "mixed" : pm;
+    if (!byDayPay[d].branches[branch].payments[bucket]) {
+      byDayPay[d].branches[branch].payments[bucket] = { qty: 0, total: 0, items: [] };
+    }
+    byDayPay[d].branches[branch].payments[bucket].qty += Number(s.qty || 0);
+    byDayPay[d].branches[branch].payments[bucket].total += Number(s.total || 0);
+    byDayPay[d].branches[branch].payments[bucket].items.push(s);
+    // Хосолсон гүйлгээний дотоод breakdown-ыг тэмдэглэх (пропорционалаар)
+    if (isMixed && Array.isArray(s.payments)) {
+      const paymentsSum = s.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const itemTotal = Number(s.total || 0);
+      const ratio = paymentsSum > 0 ? itemTotal / paymentsSum : 0;
+      for (const p of s.payments) {
+        const method = p.method;
+        const portion = Math.round(Number(p.amount || 0) * ratio);
+        if (!byDayPay[d].branches[branch].mixedBreakdown[method]) byDayPay[d].branches[branch].mixedBreakdown[method] = 0;
+        byDayPay[d].branches[branch].mixedBreakdown[method] += portion;
+      }
+    }
   }
 
   const days = Object.keys(byDayTx).sort().reverse();
@@ -295,6 +284,22 @@ export default function KassaReportPage() {
                                   </button>
                                   {isPayOpen && (
                                     <div className="border-t border-ink/10 bg-cream/30 p-3 space-y-1.5">
+                                      {/* Хосолсоны хувьд төлбөрийн задаргаа */}
+                                      {pm === "mixed" && (
+                                        <div className="mb-2 p-2 rounded-lg bg-beak-100/50 border border-beak/30">
+                                          <p className="text-[10px] font-bold text-beak-600 uppercase mb-1">Төлбөрийн задаргаа</p>
+                                          <div className="space-y-0.5">
+                                            {Object.entries(branchData.mixedBreakdown)
+                                              .sort((a, b) => b[1] - a[1])
+                                              .map(([method, amount]) => (
+                                                <div key={method} className="flex justify-between text-xs">
+                                                  <span className="text-ink">{payLabel(method)}</span>
+                                                  <span className="font-bold text-beak-600">{formatPrice(amount)}</span>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        </div>
+                                      )}
                                       {data.items.map((it, i) => (
                                         <div key={i} className="flex items-start justify-between gap-2 text-xs py-1 border-b border-ink/5 last:border-0">
                                           <div className="flex-1 min-w-0">
@@ -302,14 +307,9 @@ export default function KassaReportPage() {
                                             {(it.size || it.color) && (
                                               <p className="text-ink-400 text-[10px]">{[it.size, it.color].filter(Boolean).join(" / ")}</p>
                                             )}
-                                            {it._split && (
-                                              <span className="inline-block mt-0.5 rounded-full bg-beak-100 text-beak-600 px-1.5 py-0.5 text-[9px] font-semibold">
-                                                ⚡ Хосолсон
-                                              </span>
-                                            )}
                                           </div>
                                           <div className="text-right shrink-0">
-                                            <p className="text-ink-400">×{it._origQty}</p>
+                                            <p className="text-ink-400">×{it.qty}</p>
                                             <p className="font-semibold">{formatPrice(it.total)}</p>
                                           </div>
                                         </div>
