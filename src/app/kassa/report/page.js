@@ -37,10 +37,17 @@ function flattenSales(sales) {
   for (const s of sales) {
     const pm = s.payment_method;
     if (typeof pm === "string" && pm.startsWith("mixed:") && Array.isArray(s.payments) && s.payments.length > 0) {
+      // Sale row-н total нь нийт төлбөрийн ямар хувь эзэлж байгааг тооцно (proportional)
+      // Учир нь sale row бүрт payments бүтнээр хадгалагддаг тул давхардал үүсэхээс сэргийлнэ
+      const paymentsSum = s.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const saleTotal = Number(s.total || 0);
+      const ratio = paymentsSum > 0 ? saleTotal / paymentsSum : 1;
+
       const sorted = [...s.payments].sort((a, b) => Number(b.amount) - Number(a.amount));
       sorted.forEach((p, idx) => {
         result.push({
-          ...s, payment_method: p.method, total: Number(p.amount),
+          ...s, payment_method: p.method,
+          total: Math.round(Number(p.amount || 0) * ratio),
           _aggregateQty: idx === 0 ? Number(s.qty || 0) : 0,
           _origQty: Number(s.qty || 0), _split: true,
         });
