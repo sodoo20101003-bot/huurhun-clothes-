@@ -49,12 +49,54 @@ export async function POST(request) {
       stockLog.push(`✓ ${it.productName} ${s1}→${newS1}|${s2}→${newS2}`);
     }
 
-    // 2️⃣ Sales мөр үүсгэх (orders хүснэгтэд бичихгүй)
+    // 2️⃣ Тооцоо
     const order_code = pad6();
     const rawTotal = items.reduce((s, it) => s + Number(it.unitPrice) * Number(it.qty), 0);
     const finalTotal = Number(totalOverride) > 0 ? Number(totalOverride) : rawTotal;
     const ratio = rawTotal > 0 ? finalTotal / rawTotal : 1;
 
+    // 3️⃣ Orders хүснэгтэд бичих (жинхэнэ schema-той тохирсон)
+    // items нь jsonb — cart-ыг бүхэлд нь хадгална
+    const itemsJson = items.map((it) => {
+      const lineRaw = Number(it.unitPrice) * Number(it.qty);
+      const lineTotal = Math.round(lineRaw * ratio);
+      return {
+        productId: it.productId,
+        productName: it.productName,
+        size: it.size,
+        color: it.color,
+        qty: Number(it.qty),
+        unitPrice: Math.round(lineTotal / Number(it.qty || 1)),
+        total: lineTotal,
+      };
+    });
+
+    // Төлбөрийн аргыг note-д хадгалах (payment_method багана байхгүй тул)
+    const paymentNote = `[Төлбөр: ${paymentMethod || "cash"}]`;
+    const combinedNote = note ? `${paymentNote} ${note}` : paymentNote;
+
+    const orderPayload = {
+      order_code,
+      items: itemsJson,
+      total: finalTotal,
+      customer_name: customerName || "—",
+      phone: phone || null,
+      address: address || null,
+      note: combinedNote,
+      status: "pending",
+      payment_status: "paid",
+      instagram: instagram || null,
+      is_manual: true,
+      branch: branch || null,
+    };
+    if (orderDate) orderPayload.created_at = orderDate;
+
+    const { data: order, error: orderErr } = await admin.from("orders").insert(orderPayload).select().single();
+    if (orderErr) {
+      return NextResponse.json({ error: `Order үүсэхэд алдаа: ${orderErr.message}`, stockLog }, { status: 500 });
+    }
+
+    // 4️⃣ Sales мөр үүсгэх (тайлан + POS түүхэд харагдана)
     const salesRows = items.map((it) => {
       const lineRaw = Number(it.unitPrice) * Number(it.qty);
       const lineTotal = Math.round(lineRaw * ratio);
@@ -74,16 +116,9 @@ export async function POST(request) {
         created_at: orderDate || undefined,
       };
     });
-    const { error: sErr } = await admin.from("sales").insert(salesRows);
-    if (sErr) return NextResponse.json({ error: `Sales алдаа: ${sErr.message}`, stockLog }, { status: 500 });
+    await admin.from("sales").insert(salesRows);
 
-    return NextResponse.json({ 
-      ok: true, 
-      order_code, 
-      total: finalTotal,
-      customer: customerName,
-      stockLog 
-    });
+    return NextResponse.json({ ok: true, order, order_code, stockLog });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
