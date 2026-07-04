@@ -86,7 +86,6 @@ export async function POST(request) {
       payment_status: "paid",
       status: "pending",
       is_manual: true,
-      branch: branch || null,
     };
     if (orderDate) orderPayload.created_at = orderDate;
 
