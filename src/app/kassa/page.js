@@ -4,11 +4,11 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice, finalPrice, firstImageUrl, imagesForColor } from "@/lib/utils";
 
 const PAY_OPTIONS = [
-  { value: "cash", label: "💵 Бэлэн" },
-  { value: "card", label: "💳 Карт" },
-  { value: "pocket", label: "📱 Pocket" },
-  { value: "storepay", label: "🛍 StorePay" },
-  { value: "dans", label: "🏦 Данс" },
+  { value: "cash", label: "Бэлэн" },
+  { value: "card", label: "Карт" },
+  { value: "pocket", label: "Pocket" },
+  { value: "storepay", label: "StorePay" },
+  { value: "dans", label: "Данс" },
 ];
 const BRANCH_OPTIONS = [
   { value: "branch1", label: "Салбар 1" },
@@ -29,6 +29,16 @@ export default function KassaPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState({ name: "", price: "", qty: 1, categoryId: "" });
   const [manualBusy, setManualBusy] = useState(false);
+  // Ачаа орох
+  const [restockOpen, setRestockOpen] = useState(null); // { product, variant }
+  const [restockBranch, setRestockBranch] = useState("branch1");
+  const [restockQty, setRestockQty] = useState("10");
+  const [restockNote, setRestockNote] = useState("");
+  const [restockBusy, setRestockBusy] = useState(false);
+  // Өнөөдрийн түүх
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historySales, setHistorySales] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [branch, setBranch] = useState("branch1");
   const [totalOverride, setTotalOverride] = useState("");
   const [busy, setBusy] = useState(false);
@@ -133,6 +143,56 @@ export default function KassaPage() {
   const paidTotal = Object.values(payments).reduce((s, v) => s + (Number(v) || 0), 0);
   const remaining = finalTotal - paidTotal;
 
+  // === 📥 Ачаа нэмэх ===
+  async function submitRestock() {
+    if (!restockOpen) return;
+    const { product, variant } = restockOpen;
+    const qty = Number(restockQty);
+    if (qty < 1) return alert("Зөв тоо оруулна уу");
+    setRestockBusy(true);
+    const res = await fetch("/api/restock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        productId: product.id,
+        productName: product.name,
+        size: variant.size,
+        color: variant.color,
+        qty,
+        note: restockNote || null,
+        branch: restockBranch,
+      }),
+    });
+    const data = await res.json();
+    setRestockBusy(false);
+    if (!res.ok) return alert(data.error || "Алдаа");
+    alert(`✅ ${qty} ширхэг нэмэгдсэн (${restockBranch === "branch1" ? "Салбар 1" : "Салбар 2"})\nНийт ${data.newStock}`);
+    setRestockOpen(null);
+    setRestockQty("10");
+    setRestockNote("");
+    setPickProduct(null);
+    await load();
+  }
+
+  // === 📋 Өнөөдрийн түүх ===
+  async function loadHistory() {
+    setHistoryLoading(true);
+    const t = new Date();
+    const start = new Date(t.getFullYear(), t.getMonth(), t.getDate()).toISOString();
+    const { data } = await supabase
+      .from("sales")
+      .select("*")
+      .eq("channel", "shop")
+      .gte("created_at", start)
+      .order("created_at", { ascending: false });
+    setHistorySales(data || []);
+    setHistoryLoading(false);
+  }
+  function openHistory() {
+    setHistoryOpen(true);
+    loadHistory();
+  }
+
   async function submitManual() {
     if (!manualForm.name.trim() || !manualForm.price) {
       return alert("Нэр болон үнэ заавал!");
@@ -233,17 +293,38 @@ export default function KassaPage() {
   }
 
   return (
-    <div className="grid h-[calc(100vh-100px)] grid-cols-1 lg:grid-cols-[420px_1fr] gap-3">
-      <div className="card flex flex-col overflow-hidden">
-        <div className="bg-ink text-cream p-3 flex items-center justify-between">
+    <div className="grid lg:h-[calc(100vh-100px)] grid-cols-1 lg:grid-cols-[420px_1fr] gap-3">
+      <div className="card flex flex-col lg:overflow-hidden h-[80vh] lg:h-auto">
+        <div className="bg-ink text-cream p-3 flex items-center justify-between shrink-0">
           <p className="font-display font-700">💼 Касс / POS</p>
-          <p className="text-xs opacity-70">{new Date().toLocaleDateString("mn-MN")}</p>
+          <div className="flex items-center gap-2">
+            <a
+              href="/kassa/manual-order"
+              className="rounded-full bg-beak text-ink hover:bg-beak-600 hover:text-cream px-3 py-1 text-xs font-bold transition"
+            >
+              📝 Гараар захиалга
+            </a>
+            <a
+              href="/kassa/report"
+              className="rounded-full bg-cream/20 hover:bg-cream/30 px-3 py-1 text-xs font-bold transition"
+            >
+              📅 Тайлан
+            </a>
+            <button
+              onClick={openHistory}
+              className="rounded-full bg-cream/20 hover:bg-cream/30 px-3 py-1 text-xs font-bold transition"
+            >
+              📋 Өнөөдрийн түүх
+            </button>
+            <p className="text-xs opacity-70">{new Date().toLocaleDateString("mn-MN")}</p>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        {/* САГС — scroll болно (хамгийн их зай эзлэхгүй) */}
+        <div className="overflow-y-auto p-2 space-y-2 min-h-[80px] max-h-[28vh] lg:max-h-[35vh] shrink-0 border-b border-ink/10">
           {cart.length === 0 ? (
-            <div className="grid h-full place-items-center text-ink-400 text-sm">
-              <div className="text-center"><div className="text-4xl mb-2">🛍</div><p>Бараа сонгож нэмнэ үү →</p></div>
+            <div className="grid h-full place-items-center text-ink-400 text-sm py-6">
+              <div className="text-center"><div className="text-3xl mb-1">🛍</div><p>Бараа сонгож нэмнэ үү →</p></div>
             </div>
           ) : cart.map((it, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg bg-cream/50 p-2">
@@ -264,57 +345,61 @@ export default function KassaPage() {
           ))}
         </div>
 
-        <div className="border-t border-ink/10 bg-cream/50 p-3 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-400">Барааны үнэ</span>
-            <span className={energyTotal !== rawTotal ? "line-through text-ink-400" : ""}>{formatPrice(energyTotal)}</span>
-          </div>
-          {energyTotal !== rawTotal && (
-            <div className="flex justify-between text-sm text-green-700">
-              <span>🎁 1+1 урамшуулал автомат</span>
-              <span>{formatPrice(rawTotal)}</span>
+        {/* ДООРХ ХЭСЭГ — бүтэн харагдана, шаардлагатай бол scroll */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="bg-cream/50 p-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-400">Барааны үнэ</span>
+              <span className={energyTotal !== rawTotal ? "line-through text-ink-400" : ""}>{formatPrice(energyTotal)}</span>
             </div>
-          )}
-          <div className="flex justify-between text-sm items-center">
-            <span className="text-ink-400">Тусгай үнэ</span>
-            <input type="number" placeholder={String(rawTotal)} value={totalOverride} onChange={(e) => setTotalOverride(e.target.value)}
-              className="w-32 rounded-md border border-ink/15 bg-paper px-2 py-1 text-right text-sm outline-none focus:border-beak" />
-          </div>
-          <div className="flex justify-between font-display font-700 text-lg border-t border-ink/10 pt-2">
-            <span>НИЙТ</span><span className="text-beak-600">{formatPrice(finalTotal)}</span>
-          </div>
-        </div>
-
-        <div className="border-t border-ink/10 p-3">
-          <p className="text-xs font-semibold text-ink-400 mb-1.5">🏪 Салбар</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {BRANCH_OPTIONS.map((b) => (
-              <button key={b.value} onClick={() => setBranch(b.value)}
-                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${branch === b.value ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"}`}>{b.label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-ink/10 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-ink-400">💳 Төлбөр (холимог байж болно)</p>
-            <p className={`text-xs font-bold ${Math.abs(remaining) > 1 ? "text-red-500" : "text-green-600"}`}>
-              {remaining > 0 ? `Үлдсэн: ${formatPrice(remaining)}` : remaining < 0 ? `Илүү: ${formatPrice(-remaining)}` : "✓ Тэнцсэн"}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            {PAY_OPTIONS.map((p) => (
-              <div key={p.value} className="flex items-center gap-2">
-                <span className="text-xs w-24">{p.label}</span>
-                <input type="number" value={payments[p.value] || ""} onChange={(e) => setPayment(p.value, e.target.value)} placeholder="0"
-                  className="flex-1 rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-beak" />
-                <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100">Бүх</button>
+            {energyTotal !== rawTotal && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span>🎁 1+1 урамшуулал автомат</span>
+                <span>{formatPrice(rawTotal)}</span>
               </div>
-            ))}
+            )}
+            <div className="flex justify-between text-sm items-center">
+              <span className="text-ink-400">Тусгай үнэ</span>
+              <input type="number" placeholder={String(rawTotal)} value={totalOverride} onChange={(e) => setTotalOverride(e.target.value)}
+                className="w-32 rounded-md border border-ink/15 bg-paper px-2 py-1 text-right text-sm outline-none focus:border-beak" />
+            </div>
+            <div className="flex justify-between font-display font-700 text-lg border-t border-ink/10 pt-2">
+              <span>НИЙТ</span><span className="text-beak-600">{formatPrice(finalTotal)}</span>
+            </div>
+          </div>
+
+          <div className="border-t border-ink/10 p-3">
+            <p className="text-xs font-semibold text-ink-400 mb-1.5">🏪 Салбар</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {BRANCH_OPTIONS.map((b) => (
+                <button key={b.value} onClick={() => setBranch(b.value)}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${branch === b.value ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"}`}>{b.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-ink/10 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-ink-400">💳 Төлбөр</p>
+              <p className={`text-xs font-bold ${Math.abs(remaining) > 1 ? "text-red-500" : "text-green-600"}`}>
+                {remaining > 0 ? `Үлдсэн: ${formatPrice(remaining)}` : remaining < 0 ? `Илүү: ${formatPrice(-remaining)}` : "✓ Тэнцсэн"}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              {PAY_OPTIONS.map((p) => (
+                <div key={p.value} className="flex items-center gap-2">
+                  <span className="text-sm font-semibold w-24 shrink-0 text-ink">{p.label}</span>
+                  <input type="number" value={payments[p.value] || ""} onChange={(e) => setPayment(p.value, e.target.value)} placeholder="0"
+                    className="flex-1 rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-right text-sm outline-none focus:border-beak" />
+                  <button onClick={() => autoFillRemaining(p.value)} className="text-xs px-2 py-1 rounded-md bg-cream hover:bg-beak-100 shrink-0">Бүх</button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_2fr] gap-2 p-3 bg-paper border-t border-ink/10">
+        {/* ДУУСГАХ — ҮРГЭЛЖ ХАРАГДАНА (sticky bottom) */}
+        <div className="grid grid-cols-[1fr_2fr] gap-2 p-3 bg-paper border-t-2 border-ink/20 shrink-0 sticky bottom-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           <button onClick={clearCart} className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-100">🗑 Цэвэрлэх</button>
           <button onClick={complete} disabled={busy || cart.length === 0}
             className="rounded-xl bg-green-600 text-white px-3 py-3 text-sm font-bold hover:bg-green-700 disabled:opacity-50">
@@ -460,17 +545,47 @@ export default function KassaPage() {
               <p className="text-xs font-semibold text-ink-400 mb-2">📏 Хэмжээ сонгох:</p>
               <div className="space-y-1.5">
                 {displayVariants.map((v, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { addToCart(pickProduct, v); setPickColor(null); }}
-                    className="flex w-full items-center justify-between rounded-lg border border-ink/15 bg-cream/30 p-3 hover:bg-beak-100 hover:border-beak transition"
-                  >
-                    <span className="font-semibold">{[v.size, v.color].filter(Boolean).join(" / ") || "—"}</span>
-                    <span className="text-xs text-ink-400">📦 {v.stock} үлдсэн</span>
-                  </button>
+                  <div key={i} className="flex items-stretch gap-1.5">
+                    <button
+                      onClick={() => { addToCart(pickProduct, v); setPickColor(null); }}
+                      className="flex-1 flex items-center justify-between rounded-lg border border-ink/15 bg-cream/30 p-3 hover:bg-beak-100 hover:border-beak transition"
+                    >
+                      <span className="font-semibold">{[v.size, v.color].filter(Boolean).join(" / ") || "—"}</span>
+                      <span className="text-xs text-ink-400">📦 {v.stock} үлдсэн</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRestockOpen({ product: pickProduct, variant: v });
+                        setRestockBranch("branch1");
+                        setRestockQty("10");
+                        setRestockNote("");
+                      }}
+                      className="w-14 grid place-items-center rounded-lg border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 transition font-bold"
+                      title="Ачаа орох"
+                    >
+                      📥
+                    </button>
+                  </div>
                 ))}
                 {variantsInStock.length === 0 && (
-                  <p className="text-center text-sm text-red-500 p-4">Бүгд дууссан</p>
+                  <div className="space-y-1.5">
+                    <p className="text-center text-sm text-red-500 p-4 bg-red-50 rounded-lg">Бүгд дууссан</p>
+                    {pickProduct._variants.map((v, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setRestockOpen({ product: pickProduct, variant: v });
+                          setRestockBranch("branch1");
+                          setRestockQty("10");
+                          setRestockNote("");
+                        }}
+                        className="flex w-full items-center justify-between rounded-lg border border-green-300 bg-green-50 text-green-700 p-3 hover:bg-green-100 transition"
+                      >
+                        <span className="font-semibold">📥 {[v.size, v.color].filter(Boolean).join(" / ") || "—"} (ачаа орох)</span>
+                        <span className="text-xs">одоо: {v.stock}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -530,6 +645,191 @@ export default function KassaPage() {
           </div>
         </div>
       )}
+
+      {/* ========= 📥 АЧАА ОРОХ MODAL (POS) ========= */}
+      {restockOpen && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" onClick={() => !restockBusy && setRestockOpen(null)}>
+          <div className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-display font-700 text-lg">📥 Ачаа орох</p>
+              <button onClick={() => setRestockOpen(null)} className="text-2xl text-ink-400">×</button>
+            </div>
+            <p className="text-sm font-semibold mb-1">{restockOpen.product.name}</p>
+            <p className="text-xs text-ink-400 mb-4">
+              {[restockOpen.variant.size, restockOpen.variant.color].filter(Boolean).join(" / ") || "—"}
+              {" · "}одоо: 📦 {restockOpen.variant.stock || 0}
+            </p>
+
+            <p className="text-xs font-semibold text-ink-400 mb-2">🏪 Аль салбарт?</p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {[
+                { v: "branch1", l: "🏪 Салбар 1" },
+                { v: "branch2", l: "🏪 Салбар 2" },
+              ].map((b) => (
+                <button
+                  key={b.v}
+                  onClick={() => setRestockBranch(b.v)}
+                  className={`rounded-lg border-2 px-3 py-2.5 text-sm font-bold transition ${
+                    restockBranch === b.v ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"
+                  }`}
+                >
+                  {b.l}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Хэдэн ширхэг?</label>
+                <input
+                  type="number" min="1"
+                  className="input"
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-400 block mb-1">Тэмдэглэл</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Заавал биш"
+                  value={restockNote}
+                  onChange={(e) => setRestockNote(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={submitRestock} disabled={restockBusy} className="btn-primary flex-1">
+                {restockBusy ? "Нэмж..." : `✓ ${restockBranch === "branch1" ? "С1" : "С2"}-д нэмэх`}
+              </button>
+              <button onClick={() => setRestockOpen(null)} disabled={restockBusy} className="btn-ghost">Болих</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========= 📋 ӨНӨӨДРИЙН ТҮҮХ MODAL ========= */}
+      {historyOpen && (() => {
+        // Зарагдалтыг order_code-аар бүлэглэх
+        const byTx = {};
+        for (const s of historySales) {
+          const key = s.order_code || `single-${s.id}`;
+          if (!byTx[key]) {
+            byTx[key] = {
+              order_code: s.order_code,
+              created_at: s.created_at,
+              payment_method: s.payment_method,
+              branch: s.branch,
+              items: [],
+              total: 0,
+              qty: 0,
+            };
+          }
+          byTx[key].items.push(s);
+          byTx[key].total += Number(s.total || 0);
+          byTx[key].qty += Number(s.qty || 0);
+        }
+        const txs = Object.values(byTx).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const grand = txs.reduce((s, x) => s + x.total, 0);
+        const grandQty = txs.reduce((s, x) => s + x.qty, 0);
+
+        const PAY_LABELS_LOCAL = {
+          cash: "💵 Бэлэн", card: "💳 Карт", pocket: "📱 Pocket",
+          storepay: "🛍 StorePay", dans: "🏦 Данс", qpay: "QPay",
+        };
+        const payL = (m) => {
+          if (!m) return "Бусад";
+          if (typeof m === "string" && m.startsWith("mixed:")) return "🔀 Холимог";
+          return PAY_LABELS_LOCAL[m] || m;
+        };
+        const timeStr = (d) => {
+          const dt = new Date(d);
+          return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+        };
+
+        return (
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" onClick={() => setHistoryOpen(false)}>
+            <div className="card w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-ink text-cream p-3 flex items-center justify-between rounded-t-2xl">
+                <p className="font-display font-700">📋 Өнөөдрийн зарагдалт</p>
+                <button onClick={() => setHistoryOpen(false)} className="text-2xl">×</button>
+              </div>
+              <div className="bg-cream/50 px-4 py-3 border-b border-ink/10 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-ink-400">Нийт {txs.length} гүйлгээ</p>
+                  <p className="font-display font-700 text-xl text-beak-600">{formatPrice(grand)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-ink-400">Ширхэг</p>
+                  <p className="font-display font-700 text-xl text-green-600">{grandQty}</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {historyLoading ? (
+                  <p className="text-center text-ink-400 p-4">Ачаалж байна...</p>
+                ) : txs.length === 0 ? (
+                  <div className="grid place-items-center h-32 text-ink-400 text-sm">
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">📋</div>
+                      <p>Өнөөдөр зарагдалт алга</p>
+                    </div>
+                  </div>
+                ) : txs.map((tx, idx) => (
+                  <div key={tx.order_code || idx} className="rounded-lg bg-cream/50 p-3 border border-ink/5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-bold bg-ink text-cream px-2 py-0.5 rounded">
+                          🕐 {timeStr(tx.created_at)}
+                        </span>
+                        <span className="text-xs text-ink-400">#{tx.order_code || "—"}</span>
+                      </div>
+                      <p className="font-display font-700 text-beak-600">{formatPrice(tx.total)}</p>
+                    </div>
+                    <div className="space-y-0.5 mb-2">
+                      {tx.items.map((it, j) => (
+                        <div key={j} className="flex items-center gap-2 text-sm">
+                          <span className="flex-1 truncate">
+                            <b>{it.product_name}</b>
+                            {(it.size || it.color) && (
+                              <span className="text-xs text-ink-400 ml-1">
+                                ({[it.size, it.color].filter(Boolean).join(" / ")})
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-xs text-ink-400">×{it.qty}</span>
+                          <span className="text-sm font-display font-600 w-20 text-right">{formatPrice(it.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-ink/5">
+                      <span className="rounded-full bg-paper border border-ink/15 px-2 py-0.5 text-xs">{payL(tx.payment_method)}</span>
+                      {tx.branch && (
+                        <span className="rounded-full bg-beak-100 border border-beak/30 text-beak-600 px-2 py-0.5 text-xs font-semibold">
+                          🏪 {tx.branch === "branch1" ? "Салбар 1" : "Салбар 2"}
+                        </span>
+                      )}
+                      <span className="ml-auto text-xs text-ink-400">{tx.qty} ширхэг</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-ink/10 p-3 bg-paper rounded-b-2xl">
+                <button
+                  onClick={loadHistory}
+                  className="w-full rounded-lg border border-ink/15 bg-cream/30 px-3 py-2 text-sm font-semibold hover:bg-cream transition"
+                  disabled={historyLoading}
+                >
+                  {historyLoading ? "Ачаалж..." : "🔄 Шинэчлэх"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
