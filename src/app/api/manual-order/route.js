@@ -75,7 +75,7 @@ export async function POST(request) {
     const ratio = rawTotal > 0 ? finalTotal / rawTotal : 1;
 
     const orderPayload = {
-      code: order_code,
+      order_code: order_code,
       customer_name: customerName || "—",
       phone: phone || null,
       address: address || null,
