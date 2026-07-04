@@ -12,8 +12,7 @@ export async function POST(request) {
     const body = await request.json();
     const {
       customerName, phone, address, instagram, note,
-      items, // [{productId, productName, size, color, qty, unitPrice}]
-      paymentMethod, branch, orderDate, totalOverride,
+      items, paymentMethod, branch, orderDate, totalOverride,
     } = body;
 
     if (!Array.isArray(items) || items.length === 0)
@@ -30,71 +29,32 @@ export async function POST(request) {
       if (it.size) q = q.eq("size", it.size); else q = q.is("size", null);
       if (it.color) q = q.eq("color", it.color); else q = q.is("color", null);
       const { data: variants, error: vErr } = await q;
-      if (vErr) {
-        stockLog.push(`Variant хайхад алдаа: ${it.productName} - ${vErr.message}`);
-        continue;
-      }
-      if (!variants?.length) {
-        stockLog.push(`Variant олдсонгүй: ${it.productName} (${it.size}/${it.color})`);
-        continue;
-      }
+      if (vErr) { stockLog.push(`err: ${it.productName}`); continue; }
+      if (!variants?.length) { stockLog.push(`missing: ${it.productName}`); continue; }
       const v = variants[0];
       const s1 = Number(v.stock_branch1 || 0);
       const s2 = Number(v.stock_branch2 || 0);
       const qty = Number(it.qty);
       let newS1 = s1, newS2 = s2;
       if (targetBranch === "branch1") {
-        if (qty <= s1) {
-          newS1 = s1 - qty;
-        } else {
-          newS1 = 0;
-          newS2 = Math.max(0, s2 - (qty - s1));
-        }
+        if (qty <= s1) newS1 = s1 - qty;
+        else { newS1 = 0; newS2 = Math.max(0, s2 - (qty - s1)); }
       } else {
-        if (qty <= s2) {
-          newS2 = s2 - qty;
-        } else {
-          newS2 = 0;
-          newS1 = Math.max(0, s1 - (qty - s2));
-        }
+        if (qty <= s2) newS2 = s2 - qty;
+        else { newS2 = 0; newS1 = Math.max(0, s1 - (qty - s2)); }
       }
-      const { error: uErr } = await admin.from("product_variants")
+      await admin.from("product_variants")
         .update({ stock_branch1: newS1, stock_branch2: newS2, stock: newS1 + newS2 })
         .eq("id", v.id);
-      if (uErr) {
-        stockLog.push(`Хасах алдаа: ${it.productName} - ${uErr.message}`);
-      } else {
-        stockLog.push(`✓ ${it.productName} (${it.size}/${it.color}): ${s1}→${newS1} | ${s2}→${newS2}`);
-      }
+      stockLog.push(`✓ ${it.productName} ${s1}→${newS1}|${s2}→${newS2}`);
     }
 
-    // 2️⃣ Order үүсгэх
+    // 2️⃣ Sales мөр үүсгэх (orders хүснэгтэд бичихгүй)
     const order_code = pad6();
     const rawTotal = items.reduce((s, it) => s + Number(it.unitPrice) * Number(it.qty), 0);
     const finalTotal = Number(totalOverride) > 0 ? Number(totalOverride) : rawTotal;
     const ratio = rawTotal > 0 ? finalTotal / rawTotal : 1;
 
-    const orderPayload = {
-      order_code: order_code,
-      customer_name: customerName || "—",
-      phone: phone || null,
-      address: address || null,
-      instagram: instagram || null,
-      note: note || null,
-      total: finalTotal,
-      payment_method: paymentMethod || "cash",
-      payment_status: "paid",
-      status: "pending",
-      is_manual: true,
-    };
-    if (orderDate) orderPayload.created_at = orderDate;
-
-    const { data: order, error: orderErr } = await admin.from("orders").insert(orderPayload).select().single();
-    if (orderErr) {
-      return NextResponse.json({ error: `Order үүсэхэд алдаа: ${orderErr.message}`, stockLog }, { status: 500 });
-    }
-
-    // 3️⃣ Sales мөр үүсгэх
     const salesRows = items.map((it) => {
       const lineRaw = Number(it.unitPrice) * Number(it.qty);
       const lineTotal = Math.round(lineRaw * ratio);
@@ -114,9 +74,16 @@ export async function POST(request) {
         created_at: orderDate || undefined,
       };
     });
-    await admin.from("sales").insert(salesRows);
+    const { error: sErr } = await admin.from("sales").insert(salesRows);
+    if (sErr) return NextResponse.json({ error: `Sales алдаа: ${sErr.message}`, stockLog }, { status: 500 });
 
-    return NextResponse.json({ ok: true, order, stockLog });
+    return NextResponse.json({ 
+      ok: true, 
+      order_code, 
+      total: finalTotal,
+      customer: customerName,
+      stockLog 
+    });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
