@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 
 function StorePayInner() {
   const router = useRouter();
-  const { cart, clearCart } = useCart();
+  const cartContext = useCart();
+  const cart = cartContext?.cart || [];
+  const clearCart = cartContext?.clearCart || (() => {});
 
   const [step, setStep] = useState("form");
   const [mobileNumber, setMobileNumber] = useState("");
@@ -21,10 +23,17 @@ function StorePayInner() {
   const [loanId, setLoanId] = useState("");
   const [error, setError] = useState("");
   const [pollCount, setPollCount] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
-  const itemsTotal = cart.reduce((s, it) => s + Number(it.unitPrice) * Number(it.qty), 0);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const itemsTotal = (cart || []).reduce((s, it) => s + Number(it.unitPrice || 0) * Number(it.qty || 0), 0);
   const deliveryFee = 7000;
   const totalAmount = itemsTotal + deliveryFee;
+
+  if (!mounted) return <div className="p-4 text-ink-400">Ачаалж байна...</div>;
 
   async function createOrder() {
     setError("");
