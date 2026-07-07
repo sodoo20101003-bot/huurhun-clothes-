@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const STOREPAY_BASE = "https://service.storepay.mn/lend-merchant";
-const STOREPAY_AUTH_URL = "https://service.storepay.mn/merchantuaa/oauth/token";
+const STOREPAY_AUTH_URL = "https://service.storepay.mn/merchant-uaa/oauth/token";
 
 const APP_USERNAME = process.env.STOREPAY_APP_USERNAME;
 const APP_PASSWORD = process.env.STOREPAY_APP_PASSWORD;
