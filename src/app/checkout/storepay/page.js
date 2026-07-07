@@ -1,15 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/utils";
 
-export default function StorePayCheckout() {
+export const dynamic = "force-dynamic";
+
+function StorePayInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { cart, clearCart } = useCart();
 
-  const [step, setStep] = useState("form"); // form | waiting | success | error
+  const [step, setStep] = useState("form");
   const [mobileNumber, setMobileNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [address, setAddress] = useState("");
@@ -25,7 +26,6 @@ export default function StorePayCheckout() {
   const deliveryFee = 7000;
   const totalAmount = itemsTotal + deliveryFee;
 
-  // Захиалга үүсгэх
   async function createOrder() {
     setError("");
     if (!/^\d{8}$/.test(mobileNumber.replace(/\D/g, ""))) {
@@ -71,7 +71,6 @@ export default function StorePayCheckout() {
     }
   }
 
-  // 5 секунд тутам төлбөр шалгах
   useEffect(() => {
     if (step !== "waiting" || !orderCode) return;
     const interval = setInterval(async () => {
@@ -191,5 +190,13 @@ export default function StorePayCheckout() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function StorePayCheckout() {
+  return (
+    <Suspense fallback={<div className="p-4">Ачаалж байна...</div>}>
+      <StorePayInner />
+    </Suspense>
   );
 }
