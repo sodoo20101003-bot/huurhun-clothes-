@@ -76,15 +76,29 @@ export default function CheckoutPage() {
     try {
       if (paymentMethod === "storepay") {
         // StorePay flow — dedicated page руу шилжинэ
-        // storage-т cart мэдээллийг хадгалж, /checkout/storepay хуудсанд шилжүүлнэ
-        sessionStorage.setItem("storepay_checkout_data", JSON.stringify({
-          items, customerName: form.email, phone: form.phone, address: form.address,
-          note: [
-            form.door_code && `Орцны код: ${form.door_code}`,
-            form.map_link && `📍 Газрын зураг: ${form.map_link}`,
-            form.note,
-          ].filter(Boolean).join(" · "),
-        }));
+        try {
+          const cartData = {
+            items: (items || []).map(it => ({
+              productId: it.productId || it.id || null,
+              productName: it.name || it.productName || "Бараа",
+              size: it.size || null,
+              color: it.color || null,
+              qty: Number(it.qty || 1),
+              unitPrice: Number(it.unitPrice || it.price || 0),
+            })),
+            customerName: form.email,
+            phone: form.phone,
+            address: form.address,
+            note: [
+              form.door_code && `Орцны код: ${form.door_code}`,
+              form.map_link && `📍 Газрын зураг: ${form.map_link}`,
+              form.note,
+            ].filter(Boolean).join(" · "),
+          };
+          sessionStorage.setItem("storepay_checkout_data", JSON.stringify(cartData));
+        } catch (e) {
+          console.error("Cart save error:", e);
+        }
         router.push(`/checkout/storepay`);
         return;
       }

@@ -9,74 +9,71 @@ export const dynamic = "force-dynamic";
 function StorePayInner() {
   const router = useRouter();
   const cartContext = useCart();
-  const cart = cartContext?.cart || [];
-  const clearCart = cartContext?.clearCart || (() => {});
+  const clearCart = cartContext?.clear || (() => {});
 
-  const [step, setStep] = useState("form");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [address, setAddress] = useState("");
-  const [note, setNote] = useState("");
-  const [instagram, setInstagram] = useState("");
-  
+  const [mounted, setMounted] = useState(false);
+  const [checkoutData, setCheckoutData] = useState(null);
+  const [step, setStep] = useState("confirm"); // confirm | waiting | success | error
   const [orderCode, setOrderCode] = useState("");
   const [loanId, setLoanId] = useState("");
   const [error, setError] = useState("");
   const [pollCount, setPollCount] = useState(0);
-  const [mounted, setMounted] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    try {
+      const stored = sessionStorage.getItem("storepay_checkout_data");
+      if (stored) {
+        setCheckoutData(JSON.parse(stored));
+      } else {
+        // Ямар нэг мэдээлэл байхгүй бол checkout руу буцаах
+        router.push("/checkout");
+      }
+    } catch (e) {
+      router.push("/checkout");
+    }
   }, []);
 
-  const itemsTotal = (cart || []).reduce((s, it) => s + Number(it.unitPrice || 0) * Number(it.qty || 0), 0);
+  const itemsTotal = (checkoutData?.items || []).reduce(
+    (s, it) => s + Number(it.unitPrice || 0) * Number(it.qty || 0), 0
+  );
   const deliveryFee = 7000;
   const totalAmount = itemsTotal + deliveryFee;
 
-  if (!mounted) return <div className="p-4 text-ink-400">Ачаалж байна...</div>;
-
   async function createOrder() {
     setError("");
-    if (!/^\d{8}$/.test(mobileNumber.replace(/\D/g, ""))) {
-      setError("Утасны дугаар 8 оронтой байх ёстой");
-      return;
-    }
-    if (!customerName || !address) {
-      setError("Нэр, хаяг заавал");
-      return;
-    }
-    if (cart.length === 0) {
-      setError("Сагс хоосон байна");
-      return;
-    }
-
+    setProcessing(true);
     try {
       const res = await fetch("/api/storepay/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cart.map(it => ({
-            productId: it.productId,
-            productName: it.productName,
-            size: it.size,
-            color: it.color,
-            qty: it.qty,
-            unitPrice: it.unitPrice,
-          })),
-          customerName, phone: mobileNumber, address, note, instagram,
-          mobileNumber: mobileNumber.replace(/\D/g, ""),
+          items: checkoutData.items,
+          customerName: checkoutData.customerName,
+          phone: checkoutData.phone,
+          address: checkoutData.address,
+          note: checkoutData.note,
+          mobileNumber: checkoutData.phone,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setError(data.error || "Алдаа гарлаа");
+        setProcessing(false);
         return;
       }
       setOrderCode(data.order_code);
       setLoanId(data.loanId);
       setStep("waiting");
+      // Cart цэвэрлэх
+      try {
+        clearCart();
+        sessionStorage.removeItem("storepay_checkout_data");
+      } catch {}
     } catch (e) {
       setError(e.message);
+      setProcessing(false);
     }
   }
 
@@ -94,7 +91,6 @@ function StorePayInner() {
         if (data.paid) {
           clearInterval(interval);
           setStep("success");
-          clearCart();
           setTimeout(() => router.push(`/order/${orderCode}`), 2000);
         }
       } catch {}
@@ -102,16 +98,30 @@ function StorePayInner() {
     return () => clearInterval(interval);
   }, [step, orderCode]);
 
+  if (!mounted) return <div className="p-4 text-ink-400">Ачаалж байна...</div>;
+  if (!checkoutData) return <div className="p-4 text-ink-400">Захиалгын мэдээлэл алга. Checkout руу буцаж байна...</div>;
+
   return (
     <div className="mx-auto max-w-2xl p-4">
-      <h1 className="font-display text-2xl font-700 mb-6">💳 StorePay-ээр төлөх</h1>
+      <h1 className="font-display text-2xl font-700 mb-6">⭐ StorePay-ээр төлөх</h1>
 
-      {step === "form" && (
+      {step === "confirm" && (
         <div className="card p-6 space-y-4">
-          <div className="rounded-xl bg-cream/50 p-3 space-y-1">
-            {cart.map((it, i) => (
+          <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 space-y-2">
+            <p className="text-sm font-bold text-purple-700">📱 Дараах утсанд хүсэлт илгээгдэнэ:</p>
+            <p className="font-display text-2xl font-700">+976 {checkoutData.phone}</p>
+            <p className="text-xs text-purple-600">Уг утасны дугаар StorePay app-т бүртгэлтэй байх ёстой</p>
+          </div>
+
+          <div className="rounded-xl bg-cream/50 p-4 space-y-1">
+            <p className="text-xs font-bold text-ink-400 uppercase mb-2">Захиалгын дэлгэрэнгүй</p>
+            {(checkoutData.items || []).map((it, i) => (
               <div key={i} className="flex justify-between text-sm">
-                <span>{it.productName} × {it.qty}</span>
+                <span>
+                  {it.productName} × {it.qty}
+                  {it.size ? ` · ${it.size}` : ""}
+                  {it.color ? ` · ${it.color}` : ""}
+                </span>
                 <span>{formatPrice(it.unitPrice * it.qty)}</span>
               </div>
             ))}
@@ -121,50 +131,22 @@ function StorePayInner() {
             </div>
             <div className="flex justify-between font-display font-700 text-lg pt-2 border-t border-ink/10">
               <span>Нийт</span>
-              <span className="text-beak-600">{formatPrice(totalAmount)}</span>
+              <span className="text-purple-700">{formatPrice(totalAmount)}</span>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-ink-400 font-semibold">Утасны дугаар (StorePay-т бүртгэлтэй)</label>
-              <input
-                type="tel"
-                value={mobileNumber}
-                onChange={(e) => setMobileNumber(e.target.value)}
-                placeholder="88112233"
-                className="input w-full !py-3"
-              />
-              <p className="text-[10px] text-ink-400 mt-1">StorePay app-т бүртгэлтэй утасны дугаар оруулна уу</p>
-            </div>
-            <div>
-              <label className="text-xs text-ink-400 font-semibold">Нэр</label>
-              <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
-                className="input w-full !py-3" />
-            </div>
-            <div>
-              <label className="text-xs text-ink-400 font-semibold">Хаяг</label>
-              <input value={address} onChange={(e) => setAddress(e.target.value)}
-                className="input w-full !py-3" />
-            </div>
-            <div>
-              <label className="text-xs text-ink-400 font-semibold">Instagram (сонголт)</label>
-              <input value={instagram} onChange={(e) => setInstagram(e.target.value)}
-                placeholder="@username" className="input w-full !py-3" />
-            </div>
-            <div>
-              <label className="text-xs text-ink-400 font-semibold">Тэмдэглэл (сонголт)</label>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)}
-                className="input w-full !py-3" rows={2} />
-            </div>
+          {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</p>}
+
+          <div className="flex gap-2">
+            <button onClick={() => router.push("/checkout")}
+              className="flex-1 py-3 rounded-full border-2 border-ink/15 font-bold hover:border-ink/30 transition">
+              ← Буцах
+            </button>
+            <button onClick={createOrder} disabled={processing}
+              className="flex-[2] py-3 rounded-full bg-purple-600 text-white font-bold hover:bg-purple-700 transition disabled:opacity-50">
+              {processing ? "Илгээж байна..." : `⭐ ${formatPrice(totalAmount)} төлөх`}
+            </button>
           </div>
-
-          {error && <p className="text-red-500 text-sm bg-red-50 p-2 rounded">{error}</p>}
-
-          <button onClick={createOrder}
-            className="w-full py-3 rounded-full bg-ink text-cream font-bold hover:opacity-90 transition">
-            💳 StorePay-ээр {formatPrice(totalAmount)} төлөх
-          </button>
         </div>
       )}
 
@@ -172,21 +154,17 @@ function StorePayInner() {
         <div className="card p-6 text-center space-y-4">
           <div className="text-6xl">📱</div>
           <h2 className="font-display font-700 text-xl">StorePay app-с зөвшөөрлийг хүлээж байна</h2>
-          <div className="bg-cream/50 p-4 rounded-xl space-y-2 text-left text-sm">
-            <p>📱 <b>Утсаа шалгана уу</b></p>
-            <p>1. StorePay app нээ</p>
-            <p>2. Ирсэн notification эсвэл "Хүлээж буй хүсэлт" харах</p>
-            <p>3. <b>{formatPrice(totalAmount)}</b> хүсэлтийг зөвшөөр</p>
+          <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl space-y-2 text-left text-sm">
+            <p className="font-bold text-purple-700">📱 Утсаа шалгана уу:</p>
+            <p>1. <b>StorePay app</b> нээх</p>
+            <p>2. Ирсэн notification эсвэл <b>"Хүлээж буй хүсэлт"</b> харах</p>
+            <p>3. <b>{formatPrice(totalAmount)}</b> хүсэлтийг зөвшөөрөх</p>
           </div>
           <div className="flex items-center justify-center gap-2 text-ink-400 text-sm">
-            <div className="animate-spin h-4 w-4 border-2 border-beak border-t-transparent rounded-full" />
-            <span>Шалгаж байна... ({pollCount} удаа)</span>
+            <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full" />
+            <span>Автомат шалгаж байна... ({pollCount})</span>
           </div>
           <p className="text-xs text-ink-400">Захиалгын дугаар: <b>#{orderCode}</b></p>
-          <button onClick={() => setStep("form")}
-            className="text-xs text-ink-400 underline">
-            Цуцлаад буцах
-          </button>
         </div>
       )}
 
