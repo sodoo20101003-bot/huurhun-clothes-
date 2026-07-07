@@ -1,41 +1,83 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
+import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 function StorePayInner() {
   const router = useRouter();
-  const cartContext = useCart();
-  const clearCart = cartContext?.clear || (() => {});
 
   const [mounted, setMounted] = useState(false);
   const [checkoutData, setCheckoutData] = useState(null);
-  const [step, setStep] = useState("confirm"); // confirm | waiting | success | error
+  const [step, setStep] = useState("confirm");
   const [orderCode, setOrderCode] = useState("");
   const [loanId, setLoanId] = useState("");
   const [error, setError] = useState("");
   const [pollCount, setPollCount] = useState(0);
   const [processing, setProcessing] = useState(false);
 
+  // Mount + read session storage
   useEffect(() => {
     setMounted(true);
-    try {
-      const stored = sessionStorage.getItem("storepay_checkout_data");
-      if (stored) {
-        setCheckoutData(JSON.parse(stored));
-      } else {
-        // Ямар нэг мэдээлэл байхгүй бол checkout руу буцаах
-        router.push("/checkout");
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.sessionStorage.getItem("storepay_checkout_data");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setCheckoutData(parsed);
+        }
+      } catch (e) {
+        console.error("Session storage read error:", e);
       }
-    } catch (e) {
-      router.push("/checkout");
     }
   }, []);
 
-  const itemsTotal = (checkoutData?.items || []).reduce(
+  // Polling
+  useEffect(() => {
+    if (step !== "waiting" || !orderCode) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/storepay/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_code: orderCode }),
+        });
+        const data = await res.json();
+        setPollCount(c => c + 1);
+        if (data.paid) {
+          clearInterval(interval);
+          setStep("success");
+          setTimeout(() => router.push(`/order/${orderCode}`), 2000);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [step, orderCode, router]);
+
+  // Loading state
+  if (!mounted) {
+    return <div className="p-4 text-ink-400">Ачаалж байна...</div>;
+  }
+
+  // No checkout data
+  if (!checkoutData) {
+    return (
+      <div className="mx-auto max-w-md p-8 text-center">
+        <div className="text-5xl mb-3">📦</div>
+        <h1 className="font-display text-xl font-700 mb-2">Захиалгын мэдээлэл алга</h1>
+        <p className="text-sm text-ink-400 mb-4">
+          Checkout хуудсанд орж мэдээллээ бөглөнө үү.
+        </p>
+        <Link href="/checkout" className="btn-accent inline-block">
+          → Checkout руу очих
+        </Link>
+      </div>
+    );
+  }
+
+  const itemsTotal = (checkoutData.items || []).reduce(
     (s, it) => s + Number(it.unitPrice || 0) * Number(it.qty || 0), 0
   );
   const deliveryFee = 7000;
@@ -66,40 +108,14 @@ function StorePayInner() {
       setOrderCode(data.order_code);
       setLoanId(data.loanId);
       setStep("waiting");
-      // Cart цэвэрлэх
       try {
-        clearCart();
-        sessionStorage.removeItem("storepay_checkout_data");
+        window.sessionStorage.removeItem("storepay_checkout_data");
       } catch {}
     } catch (e) {
       setError(e.message);
       setProcessing(false);
     }
   }
-
-  useEffect(() => {
-    if (step !== "waiting" || !orderCode) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/storepay/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order_code: orderCode }),
-        });
-        const data = await res.json();
-        setPollCount(c => c + 1);
-        if (data.paid) {
-          clearInterval(interval);
-          setStep("success");
-          setTimeout(() => router.push(`/order/${orderCode}`), 2000);
-        }
-      } catch {}
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [step, orderCode]);
-
-  if (!mounted) return <div className="p-4 text-ink-400">Ачаалж байна...</div>;
-  if (!checkoutData) return <div className="p-4 text-ink-400">Захиалгын мэдээлэл алга. Checkout руу буцаж байна...</div>;
 
   return (
     <div className="mx-auto max-w-2xl p-4">
@@ -138,10 +154,10 @@ function StorePayInner() {
           {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</p>}
 
           <div className="flex gap-2">
-            <button onClick={() => router.push("/checkout")}
-              className="flex-1 py-3 rounded-full border-2 border-ink/15 font-bold hover:border-ink/30 transition">
+            <Link href="/checkout"
+              className="flex-1 py-3 rounded-full border-2 border-ink/15 font-bold hover:border-ink/30 transition text-center">
               ← Буцах
-            </button>
+            </Link>
             <button onClick={createOrder} disabled={processing}
               className="flex-[2] py-3 rounded-full bg-purple-600 text-white font-bold hover:bg-purple-700 transition disabled:opacity-50">
               {processing ? "Илгээж байна..." : `⭐ ${formatPrice(totalAmount)} төлөх`}
@@ -182,7 +198,7 @@ function StorePayInner() {
 
 export default function StorePayCheckout() {
   return (
-    <Suspense fallback={<div className="p-4">Ачаалж байна...</div>}>
+    <Suspense fallback={<div className="p-4 text-ink-400">Ачаалж байна...</div>}>
       <StorePayInner />
     </Suspense>
   );
