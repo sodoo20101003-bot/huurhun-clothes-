@@ -13,16 +13,14 @@ export default function CheckoutPage() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [form, setForm] = useState({ email: "", phone: "", address: "", door_code: "", map_link: "", note: "" });
+  const [paymentMethod, setPaymentMethod] = useState("qpay"); // qpay | storepay
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // Нэвтэрсэн хэрэглэгчийг шалгах
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
-      if (user?.email) {
-        setForm((f) => ({ ...f, email: user.email }));
-      }
+      if (user?.email) setForm((f) => ({ ...f, email: user.email }));
       setAuthReady(true);
     });
   }, []);
@@ -39,7 +37,6 @@ export default function CheckoutPage() {
 
   const grandTotal = total + DELIVERY_FEE;
 
-  // ===== НЭВТРЭЭГҮЙ БОЛ =====
   if (!user) {
     return (
       <div className="mx-auto max-w-md px-4 py-16">
@@ -48,12 +45,8 @@ export default function CheckoutPage() {
           <h1 className="font-display text-2xl font-700">Захиалга өгөхийн тулд нэвтэрнэ үү</h1>
           <p className="mt-2 text-sm text-ink-400">
             Захиалга өгөхийн тулд эхлээд имэйл эсвэл Google хаягаар нэвтэрсэн байх шаардлагатай.
-            Энэ нь таны захиалгын мэдээллийг найдвартай хадгалах болон захиалгын кодыг таны имэйлд илгээх боломж олгоно.
           </p>
-          <Link
-            href="/login?redirect=/checkout"
-            className="btn-accent mt-6 w-full inline-block"
-          >
+          <Link href="/login?redirect=/checkout" className="btn-accent mt-6 w-full inline-block">
             Нэвтрэх / Бүртгүүлэх
           </Link>
         </div>
@@ -81,30 +74,57 @@ export default function CheckoutPage() {
     if (!form.address) return setErr("Хүргэлтийн хаягаа бөглөнө үү.");
     setLoading(true);
     try {
-      const res = await fetch("/api/qpay/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items,
-          total: grandTotal,
-          customer: {
-            name: form.email,
+      if (paymentMethod === "storepay") {
+        // StorePay flow
+        const res = await fetch("/api/storepay/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: items.map(it => ({
+              productId: it.productId || it.id,
+              productName: it.name || it.productName,
+              size: it.size,
+              color: it.color,
+              qty: it.qty,
+              unitPrice: it.unitPrice || it.price,
+            })),
+            customerName: form.email,
             phone: form.phone,
+            mobileNumber: form.phone,
             address: form.address,
             note: [
               form.door_code && `Орцны код: ${form.door_code}`,
               form.map_link && `📍 Газрын зураг: ${form.map_link}`,
               form.note,
-            ]
-              .filter(Boolean)
-              .join(" · "),
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Алдаа гарлаа");
-      clear();
-      router.push(`/order/${data.code}`);
+            ].filter(Boolean).join(" · "),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "StorePay алдаа");
+        clear();
+        router.push(`/order/${data.order_code}?method=storepay`);
+      } else {
+        // QPay flow
+        const res = await fetch("/api/qpay/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items, total: grandTotal,
+            customer: {
+              name: form.email, phone: form.phone, address: form.address,
+              note: [
+                form.door_code && `Орцны код: ${form.door_code}`,
+                form.map_link && `📍 Газрын зураг: ${form.map_link}`,
+                form.note,
+              ].filter(Boolean).join(" · "),
+            },
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Алдаа гарлаа");
+        clear();
+        router.push(`/order/${data.code}`);
+      }
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -115,83 +135,87 @@ export default function CheckoutPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="font-display text-3xl font-700">Захиалга өгөх</h1>
-      <p className="mt-1 text-sm text-ink-400">
-        Нэвтэрсэн: <b>{user.email}</b>
-      </p>
+      <p className="mt-1 text-sm text-ink-400">Нэвтэрсэн: <b>{user.email}</b></p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        {/* === ФОРМ === */}
         <div className="card p-6 space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Имэйл *</label>
-            <input
-              className="input"
-              type="email"
-              placeholder="example@gmail.com"
-              value={form.email}
-              onChange={(e) => set("email", e.target.value)}
-              disabled
-            />
+            <input className="input" type="email" value={form.email}
+              onChange={(e) => set("email", e.target.value)} disabled />
             <p className="mt-1 text-xs text-ink-400">Нэвтэрсэн хаяг — захиалгын код энд илгээгдэнэ</p>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Утас *</label>
             <div className="flex">
               <span className="grid place-items-center rounded-l-xl border border-r-0 border-ink/10 bg-cream px-3 text-sm font-semibold">+976</span>
-              <input
-                className="input !rounded-l-none"
-                placeholder="99112233"
-                value={form.phone}
-                onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 8))}
-              />
+              <input className="input !rounded-l-none" placeholder="99112233" value={form.phone}
+                onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 8))} />
             </div>
+            {paymentMethod === "storepay" && (
+              <p className="mt-1 text-xs text-purple-600 font-semibold">⚠️ StorePay app-т бүртгэлтэй утас байх шаардлагатай</p>
+            )}
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Хүргэлтийн хаяг *</label>
-            <textarea
-              className="input"
-              rows={3}
-              placeholder="Дүүрэг, хороо, гудамж, байр, тоот"
-              value={form.address}
-              onChange={(e) => set("address", e.target.value)}
-            />
+            <textarea className="input" rows={3} placeholder="Дүүрэг, хороо, гудамж, байр, тоот"
+              value={form.address} onChange={(e) => set("address", e.target.value)} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Орцны код (заавал биш)</label>
-            <input
-              className="input"
-              value={form.door_code}
-              onChange={(e) => set("door_code", e.target.value)}
-              placeholder="ж: 1234"
-            />
+            <input className="input" value={form.door_code}
+              onChange={(e) => set("door_code", e.target.value)} placeholder="ж: 1234" />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">📍 Google Maps линк (заавал биш)</label>
-            <input
-              className="input"
-              value={form.map_link}
-              onChange={(e) => set("map_link", e.target.value)}
-              placeholder="https://maps.app.goo.gl/..."
-            />
-            <p className="mt-1 text-xs text-ink-400">
-              Google Maps дээрээс байршлаа сонгоод "Share → Copy link" хийгээд энд тавь.
-              Хүргэлтийн ажилтан байршлыг хурдан олно.
-            </p>
+            <input className="input" value={form.map_link}
+              onChange={(e) => set("map_link", e.target.value)} placeholder="https://maps.app.goo.gl/..." />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold">Тэмдэглэл (заавал биш)</label>
-            <textarea
-              className="input"
-              rows={2}
-              value={form.note}
-              onChange={(e) => set("note", e.target.value)}
-              placeholder="ж: 19 цагаас хойш ирүүлээрэй"
-            />
+            <textarea className="input" rows={2} value={form.note}
+              onChange={(e) => set("note", e.target.value)} placeholder="ж: 19 цагаас хойш ирүүлээрэй" />
           </div>
+
+          {/* ===== ТӨЛБӨРИЙН АРГА СОНГОХ ===== */}
+          <div>
+            <label className="mb-2 block text-sm font-semibold">💰 Төлбөрийн арга *</label>
+            <div className="space-y-2">
+              <button type="button" onClick={() => setPaymentMethod("qpay")}
+                className={`w-full flex items-center gap-3 rounded-xl border-2 p-4 transition text-left ${
+                  paymentMethod === "qpay" ? "border-beak bg-beak-100/30" : "border-ink/15 hover:border-ink/30"
+                }`}>
+                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                  paymentMethod === "qpay" ? "border-beak" : "border-ink/30"
+                }`}>
+                  {paymentMethod === "qpay" && <div className="h-2.5 w-2.5 rounded-full bg-beak" />}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold">💳 QPay-ээр төлөх</p>
+                  <p className="text-xs text-ink-400">Хаан банк, Голомт, ХХБ, Хас гэх мэт бүх банк</p>
+                </div>
+              </button>
+
+              <button type="button" onClick={() => setPaymentMethod("storepay")}
+                className={`w-full flex items-center gap-3 rounded-xl border-2 p-4 transition text-left ${
+                  paymentMethod === "storepay" ? "border-purple-500 bg-purple-50" : "border-ink/15 hover:border-ink/30"
+                }`}>
+                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                  paymentMethod === "storepay" ? "border-purple-500" : "border-ink/30"
+                }`}>
+                  {paymentMethod === "storepay" && <div className="h-2.5 w-2.5 rounded-full bg-purple-500" />}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-purple-700">⭐ StorePay-ээр дараа төлөх</p>
+                  <p className="text-xs text-ink-400">3 сарын хугацаатай, StorePay app хэрэгтэй</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {err && <p className="text-sm text-red-500">{err}</p>}
         </div>
 
-        {/* === НИЙЛБЭР === */}
         <div className="card p-6 h-fit lg:sticky lg:top-24">
           <h2 className="font-display font-600">Захиалгын дүн</h2>
           <div className="mt-4 space-y-2 text-sm">
@@ -209,10 +233,12 @@ export default function CheckoutPage() {
             </div>
           </div>
           <button onClick={submit} disabled={loading} className="btn-accent mt-6 w-full">
-            {loading ? "Үүсгэж байна..." : "Захиалга баталгаажуулах"}
+            {loading ? "Үүсгэж байна..." : paymentMethod === "storepay" ? "⭐ StorePay-ээр захиалах" : "💳 QPay-ээр захиалах"}
           </button>
           <p className="mt-3 text-xs text-ink-400 text-center">
-            Дараа QPay-ээр төлбөрөө төлнө
+            {paymentMethod === "storepay"
+              ? "Захиалга үүсгэсний дараа утсанд ирсэн зөвшөөрлийг хүлээнэ үү"
+              : "Дараа QPay-ээр төлбөрөө төлнө"}
           </p>
         </div>
       </div>

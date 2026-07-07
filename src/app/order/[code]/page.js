@@ -23,7 +23,6 @@ export default async function OrderPage({ params }) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <div className="card overflow-hidden">
-        {/* ===== ДЭЭД ХЭСЭГ ===== */}
         <div className="bg-ink p-8 text-center text-cream">
           {paid ? (
             <>
@@ -49,7 +48,6 @@ export default async function OrderPage({ params }) {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* ===== ТӨЛӨВ ===== */}
           <div className="flex items-center justify-between">
             <span className={`chip ${paid ? "border-green-500 text-green-700" : "border-beak text-beak-600"}`}>
               {paid ? "Төлбөр төлсөн ✅" : "Төлбөр хүлээгдэж буй ⏳"}
@@ -57,7 +55,6 @@ export default async function OrderPage({ params }) {
             {paid && <span className="chip border-ink/15">{ORDER_STATUS[order.status] || order.status}</span>}
           </div>
 
-          {/* ===== АДМИН МЕССЕЖ (зөвхөн төлсний дараа) ===== */}
           {paid && order.status_message && (
             <div className="rounded-xl bg-beak-100 border border-beak/30 p-4">
               <p className="text-sm font-semibold text-ink">💬 Дэлгүүрээс мэдэгдэл:</p>
@@ -65,7 +62,6 @@ export default async function OrderPage({ params }) {
             </div>
           )}
 
-          {/* ===== ЗАХИАЛГЫН БАРАА ===== */}
           <div>
             <p className="text-sm font-semibold mb-2">Захиалсан бараа</p>
             <div className="space-y-2 text-sm">
@@ -85,12 +81,10 @@ export default async function OrderPage({ params }) {
             </div>
           </div>
 
-          {/* ===== ТӨЛБӨР ТӨЛӨӨГҮЙ БОЛ — QR КОД ===== */}
           {!paid && order.qpay_qr_image && (
             <>
               <div className="grid place-items-center rounded-2xl bg-cream p-6 text-center">
                 <p className="mb-3 text-sm font-semibold">QPay-ээр уншуулж төлнө үү</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`data:image/png;base64,${order.qpay_qr_image}`}
                   alt="QPay QR"
@@ -101,14 +95,12 @@ export default async function OrderPage({ params }) {
                 </p>
               </div>
 
-              {/* Банкны апп руу шууд орох товчнууд */}
               {(Array.isArray(order.qpay_urls) && order.qpay_urls.length > 0) && (
                 <div>
                   <p className="mb-2 text-sm font-semibold text-center sm:text-left">📱 Утсаараа банкны апп-ээр нээх:</p>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {[
                       ...order.qpay_urls,
-                      // QPay жагсаалтад байхгүй нэмэлт апп-ууд
                       ...(order.qpay_qr_text
                         ? [
                             {
@@ -116,12 +108,6 @@ export default async function OrderPage({ params }) {
                               description: "Pocket",
                               logo: "https://play-lh.googleusercontent.com/QFx6qsAcVZJaqs_Mehbz0LqV0p_kJ_PEHfZ_zfYJEZQ",
                               link: `pocket://qr?data=${encodeURIComponent(order.qpay_qr_text)}`,
-                            },
-                            {
-                              name: "Story Pay",
-                              description: "Story Pay",
-                              logo: "https://play-lh.googleusercontent.com/8wgKjEhB7gB6dgF1pTzMqVZxRfIQwzL_TaSpDhKbVNw",
-                              link: `storypay://q?qPay_QRcode=${encodeURIComponent(order.qpay_qr_text)}`,
                             },
                           ]
                         : []),
@@ -132,7 +118,6 @@ export default async function OrderPage({ params }) {
                         className="flex flex-col items-center gap-1 rounded-xl bg-cream p-2 hover:bg-beak-100 transition"
                         title={b.description || b.name}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={b.logo} alt={b.name} className="h-10 w-10 rounded-lg object-contain bg-white" />
                         <span className="text-[10px] text-ink-400 text-center leading-tight line-clamp-1">
                           {b.description || b.name}
@@ -147,54 +132,30 @@ export default async function OrderPage({ params }) {
             </>
           )}
 
-          {/* ===== ТӨЛСНИЙ ДАРАА — ЗААВАР ===== */}
           {paid && (
             <>
               <div className="rounded-xl bg-cream p-5 space-y-4">
                 <h3 className="font-display text-base font-600">📋 Дараа нь юу хийх вэ?</h3>
-
                 <div className="space-y-3 text-sm text-ink-400">
                   <div className="flex gap-3">
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-cream">1</span>
-                    <p>
-                      <b className="text-ink">Кодоо хадгалаарай</b> — дээрх 6 оронтой код бол таны захиалгын дугаар.
-                      Хүргэлт ирэхэд кодоо хүргэлтийн ажилтанд хэлж өгнө.
-                    </p>
+                    <p><b className="text-ink">Кодоо хадгалаарай</b> — дээрх 6 оронтой код бол таны захиалгын дугаар. Хүргэлт ирэхэд кодоо хүргэлтийн ажилтанд хэлж өгнө.</p>
                   </div>
-
                   <div className="flex gap-3">
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-cream">2</span>
-                    <p>
-                      <b className="text-ink">Хүргэлтийн мэдээлэл</b> — бид танд удахгүй утсаар эсвэл Instagram-аар
-                      хүргэлтийн цагийг мэдэгдэнэ.
-                    </p>
+                    <p><b className="text-ink">Хүргэлтийн мэдээлэл</b> — бид танд удахгүй утсаар эсвэл Instagram-аар хүргэлтийн цагийг мэдэгдэнэ.</p>
                   </div>
-
                   <div className="flex gap-3">
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-cream">3</span>
-                    <p>
-                      <b className="text-ink">Захиалга шалгах</b> — манай{" "}
-                      <Link href="/chat" className="text-beak-600 font-semibold hover:underline">
-                        чат бот
-                      </Link>
-                      {" "}руу кодоо илгээхэд хүргэлтийн төлвийг шууд харуулна.
-                    </p>
+                    <p><b className="text-ink">Захиалга шалгах</b> — манай <Link href="/chat" className="text-beak-600 font-semibold hover:underline">чат бот</Link> руу кодоо илгээхэд хүргэлтийн төлвийг шууд харуулна.</p>
                   </div>
-
                   <div className="flex gap-3">
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-cream">4</span>
-                    <p>
-                      <b className="text-ink">Асуулт байвал</b> — Instagram хаягаар холбогдоорой:
-                    </p>
+                    <p><b className="text-ink">Асуулт байвал</b> — Instagram хаягаар холбогдоорой:</p>
                   </div>
                 </div>
-
-                <a
-                  href={INSTAGRAM}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-3 rounded-xl bg-paper p-4 border border-ink/10 hover:border-beak/40 transition"
-                >
+                <a href={INSTAGRAM} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-3 rounded-xl bg-paper p-4 border border-ink/10 hover:border-beak/40 transition">
                   <span className="text-2xl">📸</span>
                   <div>
                     <p className="font-semibold text-sm">@huurhun_clothes</p>
@@ -202,14 +163,9 @@ export default async function OrderPage({ params }) {
                   </div>
                 </a>
               </div>
-
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Link href="/chat" className="btn-primary flex-1 text-center">
-                  💬 Захиалга шалгах бот
-                </Link>
-                <Link href="/" className="btn-ghost flex-1 text-center">
-                  Дэлгүүр рүү буцах
-                </Link>
+                <Link href="/chat" className="btn-primary flex-1 text-center">💬 Захиалга шалгах бот</Link>
+                <Link href="/" className="btn-ghost flex-1 text-center">Дэлгүүр рүү буцах</Link>
               </div>
             </>
           )}
