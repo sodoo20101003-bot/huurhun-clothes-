@@ -18,22 +18,81 @@ function pad6() {
 
 // StorePay-ээс access token авах
 async function getStorePayToken() {
-  const basicAuth = Buffer.from(`${BASIC_USERNAME}:${BASIC_PASSWORD}`).toString("base64");
-  const url = `${STOREPAY_AUTH_URL}?grant_type=password&username=${encodeURIComponent(APP_USERNAME)}&password=${encodeURIComponent(APP_PASSWORD)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`StorePay auth failed: ${res.status} - ${errText}`);
+  if (!APP_USERNAME || !APP_PASSWORD || !BASIC_USERNAME || !BASIC_PASSWORD) {
+    throw new Error(`Env variables дутуу: APP_USER=${!!APP_USERNAME}, APP_PWD=${!!APP_PASSWORD}, BASIC_USER=${!!BASIC_USERNAME}, BASIC_PWD=${!!BASIC_PASSWORD}`);
   }
-  const data = await res.json();
-  if (!data.access_token) throw new Error("access_token missing");
-  return data.access_token;
+  const basicAuth = Buffer.from(`${BASIC_USERNAME}:${BASIC_PASSWORD}`).toString("base64");
+  
+  // Оролдлого 1: Query параметртэй
+  const attemptResults = [];
+  
+  const urlWithQuery = `${STOREPAY_AUTH_URL}?grant_type=password&username=${encodeURIComponent(APP_USERNAME)}&password=${encodeURIComponent(APP_PASSWORD)}`;
+  try {
+    const res = await fetch(urlWithQuery, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${basicAuth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    const txt = await res.text();
+    if (res.ok) {
+      const data = JSON.parse(txt);
+      if (data.access_token) return data.access_token;
+    }
+    attemptResults.push(`URL-query: HTTP ${res.status} - ${txt.substring(0, 200)}`);
+  } catch (e) {
+    attemptResults.push(`URL-query throw: ${e.message}`);
+  }
+  
+  // Оролдлого 2: Body-д form data
+  try {
+    const formBody = new URLSearchParams({
+      grant_type: "password",
+      username: APP_USERNAME,
+      password: APP_PASSWORD,
+    }).toString();
+    
+    const res = await fetch(STOREPAY_AUTH_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${basicAuth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formBody,
+    });
+    const txt = await res.text();
+    if (res.ok) {
+      const data = JSON.parse(txt);
+      if (data.access_token) return data.access_token;
+    }
+    attemptResults.push(`Body-form: HTTP ${res.status} - ${txt.substring(0, 200)}`);
+  } catch (e) {
+    attemptResults.push(`Body-form throw: ${e.message}`);
+  }
+  
+  // Оролдлого 3: URL slash-гүй + body
+  const altUrl = STOREPAY_AUTH_URL.replace("/merchantuaa/", "/merchant-uaa/");
+  try {
+    const res = await fetch(altUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${basicAuth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `grant_type=password&username=${encodeURIComponent(APP_USERNAME)}&password=${encodeURIComponent(APP_PASSWORD)}`,
+    });
+    const txt = await res.text();
+    if (res.ok) {
+      const data = JSON.parse(txt);
+      if (data.access_token) return data.access_token;
+    }
+    attemptResults.push(`Alt-URL: ${altUrl} - HTTP ${res.status} - ${txt.substring(0, 200)}`);
+  } catch (e) {
+    attemptResults.push(`Alt-URL throw: ${e.message}`);
+  }
+
+  throw new Error(`Бүх оролдлого амжилтгүй боллоо. Details: ${attemptResults.join(" | ")}`);
 }
 
 export async function POST(request) {
