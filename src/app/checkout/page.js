@@ -75,37 +75,21 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       if (paymentMethod === "storepay") {
-        // StorePay flow
-        const res = await fetch("/api/storepay/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: items.map(it => ({
-              productId: it.productId || it.id,
-              productName: it.name || it.productName,
-              size: it.size,
-              color: it.color,
-              qty: it.qty,
-              unitPrice: it.unitPrice || it.price,
-            })),
-            customerName: form.email,
-            phone: form.phone,
-            mobileNumber: form.phone,
-            address: form.address,
-            note: [
-              form.door_code && `Орцны код: ${form.door_code}`,
-              form.map_link && `📍 Газрын зураг: ${form.map_link}`,
-              form.note,
-            ].filter(Boolean).join(" · "),
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || "StorePay алдаа");
-        clear();
-        router.push(`/order/${data.order_code}?method=storepay`);
-      } else {
-        // QPay flow
-        const res = await fetch("/api/qpay/create", {
+        // StorePay flow — dedicated page руу шилжинэ
+        // storage-т cart мэдээллийг хадгалж, /checkout/storepay хуудсанд шилжүүлнэ
+        sessionStorage.setItem("storepay_checkout_data", JSON.stringify({
+          items, customerName: form.email, phone: form.phone, address: form.address,
+          note: [
+            form.door_code && `Орцны код: ${form.door_code}`,
+            form.map_link && `📍 Газрын зураг: ${form.map_link}`,
+            form.note,
+          ].filter(Boolean).join(" · "),
+        }));
+        router.push(`/checkout/storepay`);
+        return;
+      }
+      // QPay flow
+      const res = await fetch("/api/qpay/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -124,7 +108,6 @@ export default function CheckoutPage() {
         if (!res.ok) throw new Error(data.error || "Алдаа гарлаа");
         clear();
         router.push(`/order/${data.code}`);
-      }
     } catch (e) {
       setErr(e.message);
     } finally {
