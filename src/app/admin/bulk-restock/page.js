@@ -16,7 +16,7 @@ export default function BulkRestockPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    supabase.from("products").select("id,name,price").order("name").then(({ data }) => {
+    supabase.from("products").select("id,name,price,images").order("name").then(({ data }) => {
       setProducts(data || []);
       setLoading(false);
     });
@@ -140,19 +140,27 @@ export default function BulkRestockPage() {
             className="input w-full !py-3"
           />
           <div className="grid gap-2 max-h-[70vh] overflow-y-auto">
-            {filteredProducts.map(p => (
+            {filteredProducts.map(p => {
+              const img = Array.isArray(p.images) ? (p.images[0]?.url || p.images[0]) : p.images;
+              return (
               <button
                 key={p.id}
                 onClick={() => openProduct(p)}
-                className="flex justify-between items-center p-3 rounded-lg border border-ink/10 hover:border-beak hover:bg-cream/30 transition text-left"
+                className="flex items-center gap-3 p-3 rounded-lg border border-ink/10 hover:border-beak hover:bg-cream/30 transition text-left"
               >
-                <div>
-                  <p className="font-semibold">{p.name}</p>
+                {img ? (
+                  <img src={img} alt={p.name} className="h-14 w-14 rounded-lg object-cover shrink-0 bg-cream" />
+                ) : (
+                  <div className="h-14 w-14 rounded-lg bg-cream shrink-0 grid place-items-center text-2xl">📦</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold truncate">{p.name}</p>
                   <p className="text-xs text-ink-400">{p.price?.toLocaleString()}₮</p>
                 </div>
                 <span className="text-ink-400">→</span>
               </button>
-            ))}
+              );
+            })}
             {filteredProducts.length === 0 && (
               <p className="text-center text-ink-400 py-8">Бараа олдсонгүй</p>
             )}
@@ -162,14 +170,27 @@ export default function BulkRestockPage() {
         // === VARIANT ЖАГСААЛТАД ТОО БӨГЛӨХ ===
         <div className="space-y-4">
           <div className="card p-4">
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <p className="text-xs text-ink-400">Сонгосон бараа</p>
-                <h2 className="font-display text-xl font-700">{selectedProduct.name}</h2>
+            <div className="flex justify-between items-start mb-3 gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {(() => {
+                  const img = Array.isArray(selectedProduct.images) 
+                    ? (selectedProduct.images[0]?.url || selectedProduct.images[0]) 
+                    : selectedProduct.images;
+                  return img ? (
+                    <img src={img} alt={selectedProduct.name} 
+                      className="h-16 w-16 rounded-lg object-cover shrink-0 bg-cream" />
+                  ) : (
+                    <div className="h-16 w-16 rounded-lg bg-cream shrink-0 grid place-items-center text-2xl">📦</div>
+                  );
+                })()}
+                <div className="min-w-0">
+                  <p className="text-xs text-ink-400">Сонгосон бараа</p>
+                  <h2 className="font-display text-lg font-700 truncate">{selectedProduct.name}</h2>
+                </div>
               </div>
               <button
                 onClick={() => { setSelectedProduct(null); setVariants([]); setAmounts({}); }}
-                className="text-sm text-ink-400 hover:text-ink px-3 py-1.5 rounded-lg border border-ink/15"
+                className="text-sm text-ink-400 hover:text-ink px-3 py-1.5 rounded-lg border border-ink/15 shrink-0"
               >
                 ← Өөр бараа
               </button>
