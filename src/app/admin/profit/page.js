@@ -15,7 +15,7 @@ export default function ProfitPage() {
   useEffect(() => {
     Promise.all([
       supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(10000),
-      supabase.from("products").select("id,name,price,cost_price"),
+      supabase.from("products").select("id,name,price,cost_price,images"),
     ]).then(([sRes, pRes]) => {
       setSales(sRes.data || []);
       const productMap = {};
@@ -54,6 +54,7 @@ export default function ProfitPage() {
       byProduct[productId] = {
         id: productId,
         name: product?.name || s.product_name || "—",
+        image: Array.isArray(product?.images) ? product.images[0] : product?.images,
         sellPrice: Number(product?.price || 0),
         costPrice: Number(product?.cost_price || 0),
         qty: 0,
@@ -159,11 +160,20 @@ export default function ProfitPage() {
             const margin = p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0;
             return (
               <div key={p.id} className="p-3 grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-2 items-center hover:bg-cream/20 text-sm">
-                <div className="min-w-0">
-                  <p className="font-semibold truncate">{p.name}</p>
-                  <p className="text-[10px] text-ink-400">
-                    Зарж: {formatPrice(p.sellPrice)} · Үндсэн: {formatPrice(p.costPrice)}
-                  </p>
+                <div className="flex items-center gap-2 min-w-0">
+                  {p.image ? (
+                    <img src={typeof p.image === "string" ? p.image : p.image?.url}
+                      alt={p.name}
+                      className="h-12 w-12 rounded-lg object-cover shrink-0 bg-cream" />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg bg-cream shrink-0 grid place-items-center text-2xl">📦</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold truncate">{p.name}</p>
+                    <p className="text-[10px] text-ink-400">
+                      Зарж: {formatPrice(p.sellPrice)} · Үндсэн: {formatPrice(p.costPrice)}
+                    </p>
+                  </div>
                 </div>
                 <div className="text-center">
                   <b>{p.qty}</b>

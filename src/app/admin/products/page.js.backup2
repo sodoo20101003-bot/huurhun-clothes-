@@ -273,25 +273,7 @@ export default function AdminProducts() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <input className="input" type="number" placeholder="Үнэ (₮)" value={form.price} onChange={(e) => set("price", e.target.value)} />
-
-            <label className="mb-1 mt-3 block text-sm font-semibold">💰 Үндсэн үнэ (өртөг)</label>
-            <input
-              className="input"
-              type="number"
-              placeholder="ж: 100000"
-              value={form.cost_price || ""}
-              onChange={(e) => setForm({...form, cost_price: e.target.value})}
-            />
               <input className="input" type="number" placeholder="Хямдрал (%)" value={form.discount_percent} onChange={(e) => set("discount_percent", e.target.value)} />
-
-            <label className="mb-1 mt-3 block text-sm font-semibold">💰 Үндсэн үнэ (өртөг)</label>
-            <input
-              className="input"
-              type="number"
-              placeholder="ж: 100000"
-              value={form.cost_price || ""}
-              onChange={(e) => setForm({...form, cost_price: e.target.value})}
-            />
             </div>
 
             <textarea className="input min-h-20" placeholder="Тайлбар (заавал биш)" value={form.description} onChange={(e) => set("description", e.target.value)} />
