@@ -11,8 +11,6 @@ const NAV = [
   { href: "/admin/products", label: "Бараа" },
   { href: "/admin/inventory-branches", label: "🏪 Салбар үлдэгдэл" },
   { href: "/admin/restock-history", label: "📥 Ачааны түүх" },
-  { href: "/admin/bulk-restock", label: "📦 Ачаа нэмэх" },
-  { href: "/admin/profit", label: "💰 Ашиг" },
   { href: "/admin/categories", label: "🗂 Ангилал" },
   { href: "/admin/brands", label: "🏷 Брэнд" },
   { href: "/admin/promotions", label: "Урамшуулал" },
