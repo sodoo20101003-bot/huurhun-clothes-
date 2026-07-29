@@ -87,19 +87,29 @@ export default function BulkRestockPage() {
           failCount++;
         } else {
           successCount++;
-          // Restock log — optional, ажиллахгүй бол алдалцахгүй
-          try {
-            await supabase.from("restock_logs").insert({
-              product_id: selectedProduct.id,
-              product_name: selectedProduct.name,
-              size: v.size || null,
-              color: v.color || null,
-              qty: item.s1 + item.s2,
-              branch: item.s1 > 0 && item.s2 > 0 ? "both" : (item.s1 > 0 ? "branch1" : "branch2"),
-              note: note || null,
-            });
-          } catch (e) {
-            // Restock log хүснэгт байхгүй бол алдалцахгүй
+          // Restock түүх хадгалах — олон боломжит хүснэгт нэрсийг оролдох
+          const logRow = {
+            product_id: selectedProduct.id,
+            product_name: selectedProduct.name,
+            size: v.size || null,
+            color: v.color || null,
+            qty: item.s1 + item.s2,
+            branch: item.s1 > 0 && item.s2 > 0 ? "both" : (item.s1 > 0 ? "branch1" : "branch2"),
+            note: note || null,
+          };
+          
+          // Оролдох хүснэгтийн нэрс
+          const tableNames = ["restock_logs", "restock_history", "restock_log", "inventory_logs"];
+          for (const tableName of tableNames) {
+            try {
+              const { error: logErr } = await supabase.from(tableName).insert(logRow);
+              if (!logErr) {
+                console.log(`✅ Log хадгалагдав: ${tableName}`);
+                break;
+              }
+            } catch (e) {
+              // Дараагийн нэр оролдох
+            }
           }
         }
       }
