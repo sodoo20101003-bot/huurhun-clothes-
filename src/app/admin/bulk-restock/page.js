@@ -87,29 +87,37 @@ export default function BulkRestockPage() {
           failCount++;
         } else {
           successCount++;
-          // Restock түүх хадгалах — олон боломжит хүснэгт нэрсийг оролдох
-          const logRow = {
-            product_id: selectedProduct.id,
-            product_name: selectedProduct.name,
-            size: v.size || null,
-            color: v.color || null,
-            qty: item.s1 + item.s2,
-            branch: item.s1 > 0 && item.s2 > 0 ? "both" : (item.s1 > 0 ? "branch1" : "branch2"),
-            note: note || null,
-          };
-          
-          // Оролдох хүснэгтийн нэрс
-          const tableNames = ["restock_logs", "restock_history", "restock_log", "inventory_logs"];
-          for (const tableName of tableNames) {
-            try {
-              const { error: logErr } = await supabase.from(tableName).insert(logRow);
-              if (!logErr) {
-                console.log(`✅ Log хадгалагдав: ${tableName}`);
-                break;
-              }
-            } catch (e) {
-              // Дараагийн нэр оролдох
+          // Restock түүх хадгалах — Салбар тус бүрд тусад нь мөр
+          try {
+            const logs = [];
+            if (item.s1 > 0) {
+              logs.push({
+                product_id: selectedProduct.id,
+                product_name: selectedProduct.name,
+                size: v.size || null,
+                color: v.color || null,
+                qty: item.s1,
+                branch: "branch1",
+                note: note || null,
+              });
             }
+            if (item.s2 > 0) {
+              logs.push({
+                product_id: selectedProduct.id,
+                product_name: selectedProduct.name,
+                size: v.size || null,
+                color: v.color || null,
+                qty: item.s2,
+                branch: "branch2",
+                note: note || null,
+              });
+            }
+            if (logs.length > 0) {
+              const { error: logErr } = await supabase.from("restock_logs").insert(logs);
+              if (logErr) console.error("Restock log error:", logErr);
+            }
+          } catch (e) {
+            console.warn("Restock log skip:", e);
           }
         }
       }
