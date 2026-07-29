@@ -10,7 +10,7 @@ export default function BulkRestockPage() {
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [variants, setVariants] = useState([]);
-  const [amounts, setAmounts] = useState({}); // { variantId: { s1: 5, s2: 3 } }
+  const [amounts, setAmounts] = useState({});
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -30,7 +30,6 @@ export default function BulkRestockPage() {
     const { data } = await supabase.from("product_variants")
       .select("id,size,color,stock_branch1,stock_branch2")
       .eq("product_id", p.id);
-    // Sort by color, then size
     const sorted = (data || []).sort((a, b) => {
       const colorCmp = (a.color || "").localeCompare(b.color || "");
       if (colorCmp !== 0) return colorCmp;
@@ -64,50 +63,58 @@ export default function BulkRestockPage() {
     setSaving(true);
     try {
       let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+
       for (const item of toRestock) {
-        // Салбар 1
-        if (item.s1 > 0) {
-          const res = await fetch("/api/restock", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId: selectedProduct.id,
-              productName: selectedProduct.name,
-              size: item.variant.size,
-              color: item.variant.color,
-              qty: item.s1,
-              branch: "branch1",
+        const v = item.variant;
+        const newS1 = Number(v.stock_branch1 || 0) + item.s1;
+        const newS2 = Number(v.stock_branch2 || 0) + item.s2;
+
+        // Шууд Supabase-руу UPDATE
+        const { error } = await supabase
+          .from("product_variants")
+          .update({
+            stock_branch1: newS1,
+            stock_branch2: newS2,
+            stock: newS1 + newS2,
+          })
+          .eq("id", v.id);
+
+        if (error) {
+          console.error("Restock error for variant", v.id, ":", error);
+          errors.push(`${v.size || "?"}/${v.color || "?"}: ${error.message}`);
+          failCount++;
+        } else {
+          successCount++;
+          // Restock log — optional, ажиллахгүй бол алдалцахгүй
+          try {
+            await supabase.from("restock_logs").insert({
+              product_id: selectedProduct.id,
+              product_name: selectedProduct.name,
+              size: v.size || null,
+              color: v.color || null,
+              qty: item.s1 + item.s2,
+              branch: item.s1 > 0 && item.s2 > 0 ? "both" : (item.s1 > 0 ? "branch1" : "branch2"),
               note: note || null,
-            }),
-          });
-          if (res.ok) successCount++;
-        }
-        // Салбар 2
-        if (item.s2 > 0) {
-          const res = await fetch("/api/restock", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId: selectedProduct.id,
-              productName: selectedProduct.name,
-              size: item.variant.size,
-              color: item.variant.color,
-              qty: item.s2,
-              branch: "branch2",
-              note: note || null,
-            }),
-          });
-          if (res.ok) successCount++;
+            });
+          } catch (e) {
+            // Restock log хүснэгт байхгүй бол алдалцахгүй
+          }
         }
       }
 
-      setMessage(`✅ ${successCount} ачаа амжилттай нэмэгдлээ!`);
+      if (failCount > 0) {
+        setMessage(`⚠️ ${successCount} амжилттай, ${failCount} алдаатай. Details: ${errors.join("; ")}`);
+      } else {
+        setMessage(`✅ ${successCount} variant амжилттай шинэчлэгдлээ!`);
+      }
       setAmounts({});
       setNote("");
-      // Reload variants
       await openProduct(selectedProduct);
     } catch (e) {
       setMessage(`❌ Алдаа: ${e.message}`);
+      console.error(e);
     } finally {
       setSaving(false);
     }
@@ -130,7 +137,6 @@ export default function BulkRestockPage() {
       </div>
 
       {!selectedProduct ? (
-        // === БАРАА СОНГОХ ===
         <div className="card p-4 space-y-3">
           <input
             type="text"
@@ -143,22 +149,22 @@ export default function BulkRestockPage() {
             {filteredProducts.map(p => {
               const img = Array.isArray(p.images) ? (p.images[0]?.url || p.images[0]) : p.images;
               return (
-              <button
-                key={p.id}
-                onClick={() => openProduct(p)}
-                className="flex items-center gap-3 p-3 rounded-lg border border-ink/10 hover:border-beak hover:bg-cream/30 transition text-left"
-              >
-                {img ? (
-                  <img src={img} alt={p.name} className="h-14 w-14 rounded-lg object-cover shrink-0 bg-cream" />
-                ) : (
-                  <div className="h-14 w-14 rounded-lg bg-cream shrink-0 grid place-items-center text-2xl">📦</div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{p.name}</p>
-                  <p className="text-xs text-ink-400">{p.price?.toLocaleString()}₮</p>
-                </div>
-                <span className="text-ink-400">→</span>
-              </button>
+                <button
+                  key={p.id}
+                  onClick={() => openProduct(p)}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-ink/10 hover:border-beak hover:bg-cream/30 transition text-left"
+                >
+                  {img ? (
+                    <img src={img} alt={p.name} className="h-14 w-14 rounded-lg object-cover shrink-0 bg-cream" />
+                  ) : (
+                    <div className="h-14 w-14 rounded-lg bg-cream shrink-0 grid place-items-center text-2xl">📦</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{p.name}</p>
+                    <p className="text-xs text-ink-400">{p.price?.toLocaleString()}₮</p>
+                  </div>
+                  <span className="text-ink-400">→</span>
+                </button>
               );
             })}
             {filteredProducts.length === 0 && (
@@ -167,7 +173,6 @@ export default function BulkRestockPage() {
           </div>
         </div>
       ) : (
-        // === VARIANT ЖАГСААЛТАД ТОО БӨГЛӨХ ===
         <div className="space-y-4">
           <div className="card p-4">
             <div className="flex justify-between items-start mb-3 gap-3">
@@ -202,13 +207,12 @@ export default function BulkRestockPage() {
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="ж: 2026.07.05-ны ачаа"
+                placeholder="ж: 2026.07.10-ны ачаа"
                 className="input w-full !py-2"
               />
             </div>
           </div>
 
-          {/* Variant хүснэгт */}
           <div className="card overflow-hidden">
             <div className="bg-ink text-cream p-3 grid grid-cols-[1fr_1fr_1fr_1fr] gap-2 text-xs font-bold">
               <div>Variant</div>
@@ -265,7 +269,6 @@ export default function BulkRestockPage() {
             </div>
           )}
 
-          {/* Нэг товч — бүгдийг нэмэх */}
           <button
             onClick={submitAll}
             disabled={saving}
