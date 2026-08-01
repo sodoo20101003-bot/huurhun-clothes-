@@ -62,6 +62,16 @@ export default function BulkRestockPage() {
 
     setSaving(true);
     try {
+      // Нэвтэрсэн хэрэглэгчийн ID авах
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
+      if (!userId) {
+        setMessage("❌ Нэвтэрсэн байх шаардлагатай. Нэвтэрч дараа ахин туршиж үзнэ үү.");
+        setSaving(false);
+        return;
+      }
+
       let successCount = 0;
       let failCount = 0;
       const errors = [];
@@ -71,8 +81,8 @@ export default function BulkRestockPage() {
         const newS1 = Number(v.stock_branch1 || 0) + item.s1;
         const newS2 = Number(v.stock_branch2 || 0) + item.s2;
 
-        // Шууд Supabase-руу UPDATE
-        const { error } = await supabase
+        // 1️⃣ Шууд Supabase-руу UPDATE variant
+        const { error: updateErr } = await supabase
           .from("product_variants")
           .update({
             stock_branch1: newS1,
@@ -81,51 +91,54 @@ export default function BulkRestockPage() {
           })
           .eq("id", v.id);
 
-        if (error) {
-          console.error("Restock error for variant", v.id, ":", error);
-          errors.push(`${v.size || "?"}/${v.color || "?"}: ${error.message}`);
+        if (updateErr) {
+          console.error("Variant update error for", v.id, ":", updateErr);
+          errors.push(`${v.size || "?"}/${v.color || "?"}: ${updateErr.message}`);
           failCount++;
-        } else {
-          successCount++;
-          // Restock түүх хадгалах — Салбар тус бүрд тусад нь мөр
-          try {
-            const logs = [];
-            if (item.s1 > 0) {
-              logs.push({
-                product_id: selectedProduct.id,
-                product_name: selectedProduct.name,
-                size: v.size || null,
-                color: v.color || null,
-                qty: item.s1,
-                branch: "branch1",
-                note: note || null,
-              });
-            }
-            if (item.s2 > 0) {
-              logs.push({
-                product_id: selectedProduct.id,
-                product_name: selectedProduct.name,
-                size: v.size || null,
-                color: v.color || null,
-                qty: item.s2,
-                branch: "branch2",
-                note: note || null,
-              });
-            }
-            if (logs.length > 0) {
-              const { error: logErr } = await supabase.from("restock_logs").insert(logs);
-              if (logErr) console.error("Restock log error:", logErr);
-            }
-          } catch (e) {
-            console.warn("Restock log skip:", e);
+          continue;
+        }
+        successCount++;
+
+        // 2️⃣ Restock log — Салбар тус бүрд тусад нь мөр
+        try {
+          const logs = [];
+          if (item.s1 > 0) {
+            logs.push({
+              product_id: selectedProduct.id,
+              product_name: selectedProduct.name,
+              size: v.size || null,
+              color: v.color || null,
+              qty: item.s1,
+              note: note || null,
+              created_by: userId,
+            });
           }
+          if (item.s2 > 0) {
+            logs.push({
+              product_id: selectedProduct.id,
+              product_name: selectedProduct.name,
+              size: v.size || null,
+              color: v.color || null,
+              qty: item.s2,
+              note: note || null,
+              created_by: userId,
+            });
+          }
+          if (logs.length > 0) {
+            const { error: logErr } = await supabase.from("restock_logs").insert(logs);
+            if (logErr) {
+              console.error("Restock log error:", logErr);
+            }
+          }
+        } catch (e) {
+          console.warn("Restock log skip:", e);
         }
       }
 
       if (failCount > 0) {
-        setMessage(`⚠️ ${successCount} амжилттай, ${failCount} алдаатай. Details: ${errors.join("; ")}`);
+        setMessage(`⚠️ ${successCount} амжилттай, ${failCount} алдаатай. ${errors.join("; ")}`);
       } else {
-        setMessage(`✅ ${successCount} variant амжилттай шинэчлэгдлээ!`);
+        setMessage(`✅ ${successCount} variant амжилттай шинэчлэгдлээ! Түүхэнд хадгалагдав.`);
       }
       setAmounts({});
       setNote("");
@@ -225,7 +238,7 @@ export default function BulkRestockPage() {
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="ж: 2026.07.10-ны ачаа"
+                placeholder="ж: 2026.07.31-ны ачаа"
                 className="input w-full !py-2"
               />
             </div>
