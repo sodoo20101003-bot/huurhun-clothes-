@@ -8,3 +8,9 @@ node_modules
 *.backup*
 *.pre-*
 *.before-*
+
+# Backup файлууд
+*.backup*
+*.pre-*
+*.before-*
+*.tmp
