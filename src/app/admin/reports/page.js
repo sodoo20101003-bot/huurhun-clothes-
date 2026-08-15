@@ -187,7 +187,7 @@ export default function ReportsPage() {
         </select>
         <select
           value={selectedDay}
-          onChange={(e) => setSelectedDay(e.target.value)}
+          onChange={(e) => { setSelectedDay(e.target.value); setExpandedDay(null); }}
           className="input !w-auto !py-2"
         >
           <option value="">📅 Бүх өдөр</option>
