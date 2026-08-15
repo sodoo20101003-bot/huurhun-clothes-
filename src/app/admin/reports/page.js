@@ -78,7 +78,11 @@ export default function ReportsPage() {
   const months = [...new Set(sales.map((s) => monthKey(s.created_at)))].sort().reverse();
   if (months.length === 0) months.push(monthKey(new Date()));
 
-  const monthSales = sales.filter((s) => monthKey(s.created_at) === selectedMonth);
+  const monthSales = sales.filter((s) => {
+    if (monthKey(s.created_at) !== selectedMonth) return false;
+    if (selectedDay && dayKey(s.created_at) !== selectedDay) return false;
+    return true;
+  });
   const days = [...new Set(monthSales.map(s => dayKey(s.created_at)))].sort().reverse();
 
   // === Сарын нийт ===
