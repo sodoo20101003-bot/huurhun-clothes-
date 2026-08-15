@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request) {
   try {
     const { items, payments, paymentMethod, branch, totalOverride } = await request.json();
@@ -8,37 +10,20 @@ export async function POST(request) {
       return NextResponse.json({ error: "Бараа сонгоогүй байна" }, { status: 400 });
 
     const admin = createAdminClient();
-    const branchField = branch === "branch2" ? "stock_branch2" : "stock_branch1";
 
     for (const it of items) {
       if (!it.productId) continue;
-      let q = admin.from("product_variants").select("id,stock_branch1,stock_branch2").eq("product_id", it.productId);
+      let q = admin.from("product_variants").select("id,stock").eq("product_id", it.productId);
       if (it.size) q = q.eq("size", it.size); else q = q.is("size", null);
       if (it.color) q = q.eq("color", it.color); else q = q.is("color", null);
       const { data: variants } = await q;
       if (variants?.length) {
         const v = variants[0];
-        const s1 = Number(v.stock_branch1 || 0);
-        const s2 = Number(v.stock_branch2 || 0);
-        const currentBranchStock = branchField === "stock_branch1" ? s1 : s2;
-
-        if (Number(it.qty) > currentBranchStock) {
-          const branchLabel = branchField === "stock_branch1" ? "Салбар 1" : "Салбар 2";
+        if (Number(it.qty) > Number(v.stock))
           return NextResponse.json({
-            error: `${it.productName} (${[it.size, it.color].filter(Boolean).join("/")}): ${branchLabel}-т зөвхөн ${currentBranchStock} ширхэг үлдсэн`,
+            error: `${it.productName} (${[it.size, it.color].filter(Boolean).join("/")}): зөвхөн ${v.stock} ширхэг үлдсэн`,
           }, { status: 400 });
-        }
-
-        const newS1 = branchField === "stock_branch1" ? s1 - Number(it.qty) : s1;
-        const newS2 = branchField === "stock_branch2" ? s2 - Number(it.qty) : s2;
-
-        await admin.from("product_variants")
-          .update({ 
-            stock_branch1: newS1, 
-            stock_branch2: newS2, 
-            stock: newS1 + newS2 
-          })
-          .eq("id", v.id);
+        await admin.from("product_variants").update({ stock: Number(v.stock) - Number(it.qty) }).eq("id", v.id);
       }
     }
 
