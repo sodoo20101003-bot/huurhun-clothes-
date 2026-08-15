@@ -54,7 +54,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from("sales").select("*").order("created_at", { ascending: false }),
+      supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(10000),
       supabase.from("products").select("id,name"),
       supabase.from("product_variants").select("product_id,stock"),
     ]).then(([salesRes, prodRes, varRes]) => {
