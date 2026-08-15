@@ -399,8 +399,8 @@ export default function ReportsPage() {
       <div className="card p-5">
         <h3 className="font-display font-600">📅 Өдөр бүрээр (дарж дэлгэрэнгүй харах)</h3>
         <div className="mt-3 space-y-2">
-          {dayRows.map(([day, v]) => {
-            const isOpen = expandedDay === day;
+          {dayRows.filter(([day]) => !selectedDay || day === selectedDay).map(([day, v]) => {
+            const isOpen = expandedDay === day || selectedDay === day;
             const daySales = monthSales.filter((s) => dayKey(s.created_at) === day);
             return (
               <div key={day} className="rounded-lg bg-cream/50 overflow-hidden">
