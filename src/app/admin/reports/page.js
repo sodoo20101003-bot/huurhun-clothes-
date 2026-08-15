@@ -83,7 +83,7 @@ export default function ReportsPage() {
     if (selectedDay && dayKey(s.created_at) !== selectedDay) return false;
     return true;
   });
-  const days = [...new Set(monthSales.map(s => dayKey(s.created_at)))].sort().reverse();
+  const days = [...new Set(sales.filter(s => monthKey(s.created_at) === selectedMonth).map(s => dayKey(s.created_at)))].sort().reverse();
 
   // === Сарын нийт ===
   const totalRevenue = monthSales.reduce((s, x) => s + Number(x.total || 0), 0);
