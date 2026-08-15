@@ -50,6 +50,7 @@ export default function ReportsPage() {
   const [stockMap, setStockMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(monthKey(new Date()));
+  const [selectedDay, setSelectedDay] = useState("");
   const [expandedDay, setExpandedDay] = useState(null);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function ReportsPage() {
   if (months.length === 0) months.push(monthKey(new Date()));
 
   const monthSales = sales.filter((s) => monthKey(s.created_at) === selectedMonth);
+  const days = [...new Set(monthSales.map(s => dayKey(s.created_at)))].sort().reverse();
 
   // === Сарын нийт ===
   const totalRevenue = monthSales.reduce((s, x) => s + Number(x.total || 0), 0);
@@ -174,10 +176,18 @@ export default function ReportsPage() {
         <h2 className="font-display text-lg font-700">📊 Борлуулалтын тайлан</h2>
         <select
           value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
+          onChange={(e) => { setSelectedMonth(e.target.value); setSelectedDay(""); }}
           className="input !w-auto !py-2 ml-auto"
         >
           {months.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select
+          value={selectedDay}
+          onChange={(e) => setSelectedDay(e.target.value)}
+          className="input !w-auto !py-2"
+        >
+          <option value="">📅 Бүх өдөр</option>
+          {days.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
 
