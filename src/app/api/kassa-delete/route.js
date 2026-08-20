@@ -28,15 +28,20 @@ export async function POST(request) {
     let restored = 0;
     for (const s of sales) {
       if (!s.product_id) continue;
-      let q = admin.from("product_variants").select("id,stock").eq("product_id", s.product_id);
+      let q = admin.from("product_variants").select("id,stock_branch1,stock_branch2").eq("product_id", s.product_id);
       if (s.size) q = q.eq("size", s.size); else q = q.is("size", null);
       if (s.color) q = q.eq("color", s.color); else q = q.is("color", null);
       const { data: variants } = await q;
       if (variants?.length) {
         const v = variants[0];
+        const s1 = Number(v.stock_branch1 || 0);
+        const s2 = Number(v.stock_branch2 || 0);
+        // Зарагдсан салбарт нь буцаана (branch2 бол С2, бусад бүх тохиолдолд С1)
+        const newS1 = s.branch === "branch2" ? s1 : s1 + Number(s.qty);
+        const newS2 = s.branch === "branch2" ? s2 + Number(s.qty) : s2;
         await admin
           .from("product_variants")
-          .update({ stock: Number(v.stock) + Number(s.qty) })
+          .update({ stock_branch1: newS1, stock_branch2: newS2, stock: newS1 + newS2 })
           .eq("id", v.id);
         restored += Number(s.qty);
       }

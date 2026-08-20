@@ -88,15 +88,22 @@ export async function POST(request) {
       for (const it of items) {
         if (!it.productId) continue;
         // size/color-той variant хайх
-        let q = admin.from("product_variants").select("id,stock").eq("product_id", it.productId);
+        let q = admin.from("product_variants").select("id,stock_branch1,stock_branch2").eq("product_id", it.productId);
         if (it.size) q = q.eq("size", it.size);
         if (it.color) q = q.eq("color", it.color);
         const { data: variants } = await q;
         if (variants?.length) {
-          // Эхний таарсан variant-ийг олно (нэг бараа дээр ижил size/color давхцахгүй)
+          // Веб захиалга: Салбар 1-с эхэлж хасна, хүрэлцэхгүй бол С2-с
           const v = variants[0];
-          const newStock = Math.max(0, Number(v.stock || 0) - Number(it.qty || 0));
-          await admin.from("product_variants").update({ stock: newStock }).eq("id", v.id);
+          const s1 = Number(v.stock_branch1 || 0);
+          const s2 = Number(v.stock_branch2 || 0);
+          let need = Number(it.qty || 0);
+          const from1 = Math.min(s1, need);
+          need -= from1;
+          const from2 = Math.min(s2, need);
+          const newS1 = s1 - from1;
+          const newS2 = s2 - from2;
+          await admin.from("product_variants").update({ stock_branch1: newS1, stock_branch2: newS2, stock: newS1 + newS2 }).eq("id", v.id);
         }
       }
     } catch (e) {
