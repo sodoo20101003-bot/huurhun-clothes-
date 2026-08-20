@@ -71,6 +71,8 @@ export async function POST(request) {
 }
 
 async function markPaidAndDeductStock(admin, order) {
+  // Хэрэв аль хэдийн paid бол давхар хасахгүй
+  if (order.payment_status === "paid") return;
   // Order-ыг paid болгох
   await admin.from("orders")
     .update({ payment_status: "paid", status: "pending" })

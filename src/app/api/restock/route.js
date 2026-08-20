@@ -10,10 +10,10 @@ export async function POST(request) {
 
     const admin = createAdminClient();
     const targetBranch = branch === "branch2" ? "branch2" : "branch1";
-    const stockColumn = targetBranch === "branch2" ? "stock_branch2" : "stock";
+    const stockColumn = targetBranch === "branch2" ? "stock_branch2" : "stock_branch1";
 
     // Variant олох
-    let q = admin.from("product_variants").select(`id,stock,stock_branch2`).eq("product_id", productId);
+    let q = admin.from("product_variants").select(`id,stock_branch1,stock_branch2`).eq("product_id", productId);
     if (size) q = q.eq("size", size); else q = q.is("size", null);
     if (color) q = q.eq("color", color); else q = q.is("color", null);
     const { data: variants, error: vErr } = await q;
@@ -25,7 +25,11 @@ export async function POST(request) {
     const newStock = currentStock + Number(qty);
 
     // Стокийг шинэчлэх
-    const updatePayload = { [stockColumn]: newStock };
+    const s1 = Number(v.stock_branch1 || 0);
+    const s2 = Number(v.stock_branch2 || 0);
+    const updatePayload = stockColumn === "stock_branch2"
+      ? { stock_branch2: newStock, stock: s1 + newStock }
+      : { stock_branch1: newStock, stock: newStock + s2 };
     const { error: uErr } = await admin
       .from("product_variants")
       .update(updatePayload)
