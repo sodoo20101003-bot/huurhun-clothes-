@@ -42,8 +42,13 @@ export default function KassaReportPage() {
   const [expandedDay, setExpandedDay] = useState(null);
 
   useEffect(() => {
+    // Сүүлийн 2 хоног (өнөөдөр + өчигдөр)
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 1);
+    twoDaysAgo.setHours(0, 0, 0, 0);
     supabase.from("sales")
       .select("*")
+      .gte("created_at", twoDaysAgo.toISOString())
       .order("created_at", { ascending: false })
       .limit(10000)
       .then(({ data }) => {
@@ -115,7 +120,7 @@ export default function KassaReportPage() {
     }
   }
 
-  const days = Object.keys(byDayTx).sort().reverse().slice(0, 2);
+  const days = Object.keys(byDayTx).sort().reverse();
   const grandTotal = filtered.reduce((s, x) => s + Number(x.total || 0), 0);
   const grandQty = filtered.reduce((s, x) => s + Number(x.qty || 0), 0);
   const toggle = (k) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
