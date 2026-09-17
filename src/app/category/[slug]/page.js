@@ -25,6 +25,7 @@ export default function CategoryPage() {
       const { data: prods } = await supabase
         .from("products")
         .select("*, categories(name,pair_price), brands(id,name,logo_url)")
+        .eq("show_on_web", true)
         .eq("category_id", cat.id)
         .order("created_at", { ascending: false });
       setProducts(prods || []);

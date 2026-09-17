@@ -14,6 +14,7 @@ const empty = {
   category_id: "", brand_id: "", images: [],
   variants: [{ size: "", color: "", stock_branch1: "", stock_branch2: "" }],
   pair_price: "",
+  show_on_web: true,
   gift_note: "",
 };
 
@@ -177,6 +178,7 @@ export default function AdminProducts() {
       images: normalizeImages(p.images),
       variants: [{ size: "", color: "", stock_branch1: "", stock_branch2: "" }],
       pair_price: p.pair_price || "",
+      show_on_web: p.show_on_web !== false,
       gift_note: p.gift_note || "",
     });
     supabase.from("product_variants").select("size,color,stock_branch1,stock_branch2").eq("product_id", p.id).then(({ data }) => {
@@ -214,6 +216,7 @@ export default function AdminProducts() {
       brand_id: form.brand_id || null,
       images: form.images,
       pair_price: Number(form.pair_price) || null,
+      show_on_web: form.show_on_web !== false,
       gift_note: form.gift_note || null,
     };
     let productId = form.id;
@@ -315,6 +318,16 @@ export default function AdminProducts() {
                 onChange={(e) => set("pair_price", e.target.value)}
               />
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer mt-3 p-3 rounded-lg bg-cream/50">
+              <input
+                type="checkbox"
+                checked={form.show_on_web !== false}
+                onChange={(e) => set("show_on_web", e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-semibold">🌐 Вэб дэлгүүрт харуулах</span>
+            </label>
 
             <input
               className="input"

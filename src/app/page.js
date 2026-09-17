@@ -13,10 +13,10 @@ export default async function Home() {
   const [{ data: cats }, { data: newest }, { data: deals }, { data: promos }, { data: allProducts }] =
     await Promise.all([
       supabase.from("categories").select("name,slug,image").order("sort").limit(8),
-      supabase.from("products").select("*").gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(8),
-      supabase.from("products").select("*").gt("discount_percent", 0).order("discount_percent", { ascending: false }).limit(4),
+      supabase.from("products").select("*").eq("show_on_web", true).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(8),
+      supabase.from("products").select("*").eq("show_on_web", true).gt("discount_percent", 0).order("discount_percent", { ascending: false }).limit(4),
       supabase.from("promotions").select("*").eq("active", true).limit(4),
-      supabase.from("products").select("*").order("created_at", { ascending: false }).limit(8),
+      supabase.from("products").select("*").eq("show_on_web", true).order("created_at", { ascending: false }).limit(8),
     ]);
 
   return (
