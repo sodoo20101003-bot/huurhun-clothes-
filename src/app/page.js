@@ -10,13 +10,14 @@ export default async function Home() {
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: cats }, { data: newest }, { data: deals }, { data: promos }, { data: allProducts }] =
+  const [{ data: cats }, { data: newest }, { data: deals }, { data: promos }, { data: allProducts }, { data: featured }] =
     await Promise.all([
       supabase.from("categories").select("name,slug,image").order("sort").limit(8),
       supabase.from("products").select("*").eq("show_on_web", true).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(8),
       supabase.from("products").select("*").eq("show_on_web", true).gt("discount_percent", 0).order("discount_percent", { ascending: false }).limit(4),
       supabase.from("promotions").select("*").eq("active", true).limit(4),
       supabase.from("products").select("*").eq("show_on_web", true).order("created_at", { ascending: false }).limit(8),
+      supabase.from("products").select("*").eq("show_on_web", true).eq("is_featured", true).order("created_at", { ascending: false }).limit(12),
     ]);
 
   return (
@@ -77,6 +78,16 @@ export default async function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* ОНЦЛОХ БАРАА */}
+      {featured && featured.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 py-8">
+          <h2 className="font-display text-2xl font-700">🌟 Онцлох бараа</h2>
+          <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {featured.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </section>
       )}

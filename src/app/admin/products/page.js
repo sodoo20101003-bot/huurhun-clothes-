@@ -15,6 +15,7 @@ const empty = {
   variants: [{ size: "", color: "", stock_branch1: "", stock_branch2: "" }],
   pair_price: "",
   show_on_web: true,
+  is_featured: false,
   gift_note: "",
 };
 
@@ -179,6 +180,7 @@ export default function AdminProducts() {
       variants: [{ size: "", color: "", stock_branch1: "", stock_branch2: "" }],
       pair_price: p.pair_price || "",
       show_on_web: p.show_on_web !== false,
+      is_featured: p.is_featured === true,
       gift_note: p.gift_note || "",
     });
     supabase.from("product_variants").select("size,color,stock_branch1,stock_branch2").eq("product_id", p.id).then(({ data }) => {
@@ -217,6 +219,7 @@ export default function AdminProducts() {
       images: form.images,
       pair_price: Number(form.pair_price) || null,
       show_on_web: form.show_on_web !== false,
+      is_featured: form.is_featured === true,
       gift_note: form.gift_note || null,
     };
     let productId = form.id;
@@ -327,6 +330,16 @@ export default function AdminProducts() {
                 className="w-4 h-4"
               />
               <span className="text-sm font-semibold">🌐 Вэб дэлгүүрт харуулах</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer mt-2 p-3 rounded-lg bg-cream/50">
+              <input
+                type="checkbox"
+                checked={form.is_featured === true}
+                onChange={(e) => set("is_featured", e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-semibold">🌟 Нүүрэнд онцлох</span>
             </label>
 
             <input
