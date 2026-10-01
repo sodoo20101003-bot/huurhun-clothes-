@@ -1,20 +1,19 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useMemo } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createContext, useContext, useEffect, useState, useMemo, useRef } from "react";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "huurhun_cart_v3";
 
 /**
- * Универсал урамшуулал тооцоо
- * 1. Bundle promo (2 өөр ангилалын хос: гутал+цүнх=180k)
- * 2. Product pair_price (нэг барааны 2 ширхэг: 2 авбал X)
- * 3. Category pair_price (нэг ангиллын 2 ширхэг)
+ * Cart total:
+ *   1) Bundle promos (2 өөр ангилалын хос: Sneakers + UGG = 280k)
+ *   2) Product pair_price (ижил барааг 2 ш)
+ *   3) Category pair_price (нэг ангиллын аль ч 2 бараа)
  */
 function computeCartTotal(items, bundlePromos = []) {
   if (!items?.length) return 0;
 
-  // Cart-ыг ширхэг тус бүрд задлах
+  // ширхэг тус бүрд задлах
   const units = [];
   for (const it of items) {
     const qty = Number(it.qty || 0);
@@ -33,75 +32,70 @@ function computeCartTotal(items, bundlePromos = []) {
   let total = 0;
   const usedKeys = new Set();
 
-  // ЭХЛЭЭД — Bundle promos (2 өөр ангилалын хос)
-  const activeBundles = (bundlePromos || []).filter(b => b.is_active !== false);
-  
+  // 1) BUNDLE (2 өөр ангилалын хос) эхлээд
+  const activeBundles = (bundlePromos || []).filter((b) => b.is_active !== false);
   let keepGoing = true;
   while (keepGoing) {
     keepGoing = false;
     for (const promo of activeBundles) {
-      const item1 = units.find(u => 
-        u.categoryId === promo.category1_id && !usedKeys.has(u._key)
+      const u1 = units.find((u) => u.categoryId === promo.category1_id && !usedKeys.has(u._key));
+      if (!u1) continue;
+      const u2 = units.find(
+        (u) => u.categoryId === promo.category2_id && !usedKeys.has(u._key) && u._key !== u1._key
       );
-      if (!item1) continue;
-
-      const item2 = units.find(u => 
-        u.categoryId === promo.category2_id && !usedKeys.has(u._key)
-      );
-      if (!item2) continue;
-
-      const normalTotal = item1.unitPrice + item2.unitPrice;
-      const bundlePrice = Number(promo.bundle_price);
-
-      // Bundle price ашигтай бол хэрэглэх
-      if (bundlePrice < normalTotal) {
-        usedKeys.add(item1._key);
-        usedKeys.add(item2._key);
-        total += bundlePrice;
+      if (!u2) continue;
+      const normal = u1.unitPrice + u2.unitPrice;
+      const bp = Number(promo.bundle_price);
+      if (bp < normal) {
+        usedKeys.add(u1._key);
+        usedKeys.add(u2._key);
+        total += bp;
         keepGoing = true;
       }
     }
   }
 
-  // ДАРАА — Product болон Category pair_price (ашиглагдаагүй units)
-  const remainingUnits = units.filter(u => !usedKeys.has(u._key));
-  
-  // Product ID-аар бүлэглэх
+  const remaining = units.filter((u) => !usedKeys.has(u._key));
+
+  // 2) PRODUCT pair_price — зөвхөн ижил барааг 2 ширхэг авбал
   const byProduct = {};
+  for (const u of remaining) {
+    if (!byProduct[u.productId]) byProduct[u.productId] = [];
+    byProduct[u.productId].push(u);
+  }
+  const leftovers = [];
+  for (const pid of Object.keys(byProduct)) {
+    const arr = byProduct[pid];
+    const pairPrice = Number(arr[0].pairPrice || 0);
+    if (pairPrice > 0 && arr.length >= 2) {
+      const pairs = Math.floor(arr.length / 2);
+      total += pairs * pairPrice;
+      for (let i = pairs * 2; i < arr.length; i++) leftovers.push(arr[i]);
+    } else {
+      // 1 ширхэг эсвэл product pair байхгүй → ангиллын хос руу
+      for (const u of arr) leftovers.push(u);
+    }
+  }
+
+  // 3) CATEGORY pair_price — нэг ангиллын аль ч 2 бараа
   const byCategory = {};
-  
-  for (const u of remainingUnits) {
-    if (u.pairPrice > 0) {
-      if (!byProduct[u.productId]) byProduct[u.productId] = { units: [], pairPrice: u.pairPrice };
-      byProduct[u.productId].units.push(u);
-    } else if (u.categoryPairPrice > 0 && u.categoryId) {
+  const noCat = [];
+  for (const u of leftovers) {
+    if (u.categoryPairPrice > 0 && u.categoryId) {
       if (!byCategory[u.categoryId]) byCategory[u.categoryId] = { units: [], pairPrice: u.categoryPairPrice };
       byCategory[u.categoryId].units.push(u);
     } else {
-      total += u.unitPrice;
+      noCat.push(u);
     }
   }
-
-  // Product pair_price
-  for (const pid of Object.keys(byProduct)) {
-    const { units: pUnits, pairPrice } = byProduct[pid];
-    const pairs = Math.floor(pUnits.length / 2);
-    total += pairs * pairPrice;
-    for (let i = pairs * 2; i < pUnits.length; i++) {
-      total += pUnits[i].unitPrice;
-    }
-  }
-
-  // Category pair_price
   for (const catId of Object.keys(byCategory)) {
-    const { units: cUnits, pairPrice } = byCategory[catId];
-    cUnits.sort((a, b) => b.unitPrice - a.unitPrice);
-    const pairs = Math.floor(cUnits.length / 2);
+    const { units: cu, pairPrice } = byCategory[catId];
+    cu.sort((a, b) => b.unitPrice - a.unitPrice);
+    const pairs = Math.floor(cu.length / 2);
     total += pairs * pairPrice;
-    for (let i = pairs * 2; i < cUnits.length; i++) {
-      total += cUnits[i].unitPrice;
-    }
+    for (let i = pairs * 2; i < cu.length; i++) total += cu[i].unitPrice;
   }
+  for (const u of noCat) total += u.unitPrice;
 
   return total;
 }
@@ -110,22 +104,26 @@ export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [ready, setReady] = useState(false);
   const [bundlePromos, setBundlePromos] = useState([]);
-  const supabase = createClient();
+  const loadedRef = useRef(false);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setItems(JSON.parse(raw));
       localStorage.removeItem("huurhun_cart_v2");
     } catch {}
     setReady(true);
-    
-    // Bundle promos татах
+
     loadBundlePromos();
   }, []);
 
   async function loadBundlePromos() {
     try {
+      const mod = await import("@/lib/supabase/client");
+      const supabase = mod.createClient();
       const { data } = await supabase
         .from("bundle_promos")
         .select("id,name,category1_id,category2_id,bundle_price,is_active")
@@ -174,8 +172,8 @@ export function CartProvider({ children }) {
   const count = useMemo(() => items.reduce((s, x) => s + Number(x.qty), 0), [items]);
 
   return (
-    <CartContext.Provider value={{ 
-      items, add, updateQty, remove, clear, 
+    <CartContext.Provider value={{
+      items, add, updateQty, remove, clear,
       subtotal, total, savings, count, ready,
       bundlePromos,
     }}>
@@ -194,5 +192,4 @@ export function lineTotal(item) {
   return computeCartTotal([item]);
 }
 
-// Bundle logic-ыг гадуур ашиглах боломж (POS-т)
 export { computeCartTotal };
