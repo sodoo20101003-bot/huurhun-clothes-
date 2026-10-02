@@ -24,13 +24,6 @@ export default function KassaPage() {
   const [activeBrand, setActiveBrand] = useState("all");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
-  const [bundlePromos, setBundlePromos] = useState([]);
-  useEffect(() => {
-    supabase.from("bundle_promos")
-      .select("id,name,category1_id,category2_id,bundle_price,is_active")
-      .eq("is_active", true)
-      .then(({ data }) => setBundlePromos(data || []));
-  }, []);
   const [pickProduct, setPickProduct] = useState(null);
   const [pickColor, setPickColor] = useState(null);
   const [manualOpen, setManualOpen] = useState(false);
@@ -118,47 +111,20 @@ export default function KassaPage() {
 
   function computeCartTotal(items) {
     const units = [];
-    let _idx = 0;
     for (const it of items) {
       for (let k = 0; k < it.qty; k++) {
-        units.push({ unitPrice: it.unitPrice, categoryId: it.categoryId, categoryPairPrice: it.categoryPairPrice || 0, _key: _idx++ });
+        units.push({ unitPrice: it.unitPrice, categoryId: it.categoryId, categoryPairPrice: it.categoryPairPrice || 0 });
       }
     }
-
-    let total = 0;
-    const usedKeys = new Set();
-
-    // BUNDLE (2 өөр ангилалын хос: Sneakers + UGG = 280k)
-    const activeBundles = (bundlePromos || []).filter((b) => b.is_active !== false);
-    let keepGoing = true;
-    while (keepGoing) {
-      keepGoing = false;
-      for (const promo of activeBundles) {
-        const u1 = units.find((u) => u.categoryId === promo.category1_id && !usedKeys.has(u._key));
-        if (!u1) continue;
-        const u2 = units.find((u) => u.categoryId === promo.category2_id && !usedKeys.has(u._key) && u._key !== u1._key);
-        if (!u2) continue;
-        const normal = u1.unitPrice + u2.unitPrice;
-        const bp = Number(promo.bundle_price);
-        if (bp < normal) {
-          usedKeys.add(u1._key);
-          usedKeys.add(u2._key);
-          total += bp;
-          keepGoing = true;
-        }
-      }
-    }
-
-    // CATEGORY pair (нэг ангиллын 2 бараа)
     const byCat = {};
     const noCat = [];
     for (const u of units) {
-      if (usedKeys.has(u._key)) continue;
       if (u.categoryPairPrice > 0 && u.categoryId) {
         if (!byCat[u.categoryId]) byCat[u.categoryId] = [];
         byCat[u.categoryId].push(u);
       } else noCat.push(u);
     }
+    let total = 0;
     for (const catId of Object.keys(byCat)) {
       const list = byCat[catId];
       list.sort((a, b) => b.unitPrice - a.unitPrice);
