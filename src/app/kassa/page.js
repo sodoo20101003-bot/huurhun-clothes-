@@ -13,6 +13,7 @@ const PAY_OPTIONS = [
 const BRANCH_OPTIONS = [
   { value: "branch1", label: "Салбар 1" },
   { value: "branch2", label: "Салбар 2" },
+  { value: "online", label: "🛒 Онлайн" },
 ];
 
 export default function KassaPage() {
@@ -47,6 +48,7 @@ export default function KassaPage() {
   const [historySales, setHistorySales] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [branch, setBranch] = useState("branch1");
+  const [onlineCustomer, setOnlineCustomer] = useState({ name: "", phone: "", address: "" });
   const [totalOverride, setTotalOverride] = useState("");
   const [busy, setBusy] = useState(false);
   const [payments, setPayments] = useState({});
@@ -301,6 +303,41 @@ export default function KassaPage() {
 
   async function complete() {
     if (cart.length === 0) return alert("Бараа сонгоогүй байна");
+
+    // 🛒 ОНЛАЙН ЗАХИАЛГА — хэрэглэгчийн мэдээлэлтэй, хүргэлтэд орно
+    if (branch === "online") {
+      if (!onlineCustomer.name.trim()) return alert("Хэрэглэгчийн нэр оруулна уу");
+      if (!onlineCustomer.phone.trim()) return alert("Утасны дугаар оруулна уу");
+      if (!onlineCustomer.address.trim()) return alert("Хаяг оруулна уу");
+      const paid = Object.entries(payments).filter(([, v]) => Number(v) > 0);
+      const payMethod = paid.length ? paid.sort((a, b) => b[1] - a[1])[0][0] : "cash";
+      setBusy(true);
+      const res = await fetch("/api/manual-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: onlineCustomer.name.trim(),
+          phone: onlineCustomer.phone.trim(),
+          address: onlineCustomer.address.trim(),
+          items: cart.map((it) => ({
+            productId: it.productId, productName: it.productName,
+            size: it.size, color: it.color, qty: it.qty, unitPrice: it.unitPrice,
+          })),
+          paymentMethod: payMethod,
+          branch: "branch1",
+          totalOverride: finalTotal,
+        }),
+      });
+      const data = await res.json();
+      setBusy(false);
+      if (!res.ok) return alert(data.error || "Алдаа");
+      alert(`✅ Онлайн захиалга үүслээ!\nКод: ${data.order_code}\nНийт: ${formatPrice(finalTotal)}`);
+      setCart([]); setTotalOverride(""); setPayments({});
+      setOnlineCustomer({ name: "", phone: "", address: "" });
+      await load();
+      return;
+    }
+
     if (Math.abs(remaining) > 1) return alert(`Төлбөр таарахгүй!\nҮлдсэн: ${formatPrice(remaining)}`);
     const activePayments = Object.entries(payments).filter(([, v]) => Number(v) > 0).map(([method, amount]) => ({ method, amount: Number(amount) }));
     if (activePayments.length === 0) return alert("Төлбөр сонгоно уу");
@@ -403,13 +440,20 @@ export default function KassaPage() {
           </div>
 
           <div className="border-t border-ink/10 p-3">
-            <p className="text-xs font-semibold text-ink-400 mb-1.5">🏪 Салбар</p>
-            <div className="grid grid-cols-2 gap-1.5">
+            <p className="text-xs font-semibold text-ink-400 mb-1.5">🏪 Салбар / Захиалга</p>
+            <div className="grid grid-cols-3 gap-1.5">
               {BRANCH_OPTIONS.map((b) => (
                 <button key={b.value} onClick={() => setBranch(b.value)}
                   className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${branch === b.value ? "bg-ink text-cream border-ink" : "bg-paper border-ink/15"}`}>{b.label}</button>
               ))}
             </div>
+            {branch === "online" && (
+              <div className="mt-2 space-y-1.5">
+                <input className="w-full rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-sm outline-none focus:border-beak" placeholder="👤 Нэр" value={onlineCustomer.name} onChange={(e) => setOnlineCustomer((p) => ({ ...p, name: e.target.value }))} />
+                <input className="w-full rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-sm outline-none focus:border-beak" placeholder="📞 Утас" value={onlineCustomer.phone} onChange={(e) => setOnlineCustomer((p) => ({ ...p, phone: e.target.value }))} />
+                <textarea className="w-full rounded-md border border-ink/15 bg-paper px-2 py-1.5 text-sm outline-none focus:border-beak" rows={2} placeholder="📍 Хаяг" value={onlineCustomer.address} onChange={(e) => setOnlineCustomer((p) => ({ ...p, address: e.target.value }))} />
+              </div>
+            )}
           </div>
 
           <div className="border-t border-ink/10 p-3">
