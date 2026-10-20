@@ -48,6 +48,17 @@ export default function KassaPage() {
   const [historySales, setHistorySales] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [branch, setBranch] = useState("branch1");
+  const [unlocked, setUnlocked] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  useEffect(() => {
+    try { if (sessionStorage.getItem("kassa_ok") === "1") setUnlocked(true); } catch {}
+  }, []);
+  function tryUnlock() {
+    if (pwInput === "huurhun2026") {
+      setUnlocked(true);
+      try { sessionStorage.setItem("kassa_ok", "1"); } catch {}
+    } else { alert("Нууц үг буруу"); }
+  }
   const [onlineCustomer, setOnlineCustomer] = useState({ name: "", phone: "", address: "" });
   const [totalOverride, setTotalOverride] = useState("");
   const [busy, setBusy] = useState(false);
@@ -363,6 +374,19 @@ export default function KassaPage() {
     alert(`✅ Зарагдалт амжилттай!\nНийт: ${formatPrice(data.total)}\n${data.itemCount} ширхэг`);
     setCart([]); setTotalOverride(""); setPayments({});
     await load();
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-[70vh] grid place-items-center p-4">
+        <div className="card p-6 w-full max-w-xs text-center space-y-4">
+          <p className="font-display text-xl font-700">🔒 Касс / POS</p>
+          <p className="text-sm text-ink-400">Нэвтрэх нууц үг оруулна уу</p>
+          <input type="password" value={pwInput} onChange={(e) => setPwInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") tryUnlock(); }} placeholder="Нууц үг" autoFocus className="w-full rounded-lg border border-ink/15 bg-paper px-3 py-2.5 text-center outline-none focus:border-beak" />
+          <button onClick={tryUnlock} className="btn-accent w-full">Орох</button>
+        </div>
+      </div>
+    );
   }
 
   return (
