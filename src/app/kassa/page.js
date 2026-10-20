@@ -58,7 +58,7 @@ export default function KassaPage() {
       supabase.from("categories").select("id,name,pair_price").order("sort"),
       supabase.from("brands").select("id,name,logo_url").order("sort").order("name"),
       supabase.from("products").select("*, categories(name,pair_price), brands(id,name,logo_url)").order("created_at", { ascending: false }),
-      supabase.from("product_variants").select("id,product_id,size,color,stock"),
+      supabase.from("product_variants").select("id,product_id,size,color,stock,stock_branch1,stock_branch2"),
     ]);
     setCats(c || []);
     setBrands(br || []);
@@ -88,6 +88,8 @@ export default function KassaPage() {
       ...pr,
       _variants: variantsByProduct[pr.id] || [],
       _totalStock: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock || 0), 0),
+      _stock1: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock_branch1 || 0), 0),
+      _stock2: (variantsByProduct[pr.id] || []).reduce((s, vv) => s + Number(vv.stock_branch2 || 0), 0),
     }));
     setProducts(productsWithVariants);
   }
@@ -629,7 +631,7 @@ export default function KassaPage() {
                       className="flex-1 flex items-center justify-between rounded-lg border border-ink/15 bg-cream/30 p-3 hover:bg-beak-100 hover:border-beak transition"
                     >
                       <span className="font-semibold">{[v.size, v.color].filter(Boolean).join(" / ") || "—"}</span>
-                      <span className="text-xs text-ink-400">📦 {v.stock} үлдсэн</span>
+                      <span className="text-xs text-ink-400">🏪С1 <b className="text-green-700">{v.stock_branch1 || 0}</b> · С2 <b className="text-beak-600">{v.stock_branch2 || 0}</b></span>
                     </button>
                     <button
                       onClick={() => {
@@ -660,7 +662,7 @@ export default function KassaPage() {
                         className="flex w-full items-center justify-between rounded-lg border border-green-300 bg-green-50 text-green-700 p-3 hover:bg-green-100 transition"
                       >
                         <span className="font-semibold">📥 {[v.size, v.color].filter(Boolean).join(" / ") || "—"} (ачаа орох)</span>
-                        <span className="text-xs">одоо: {v.stock}</span>
+                        <span className="text-xs">С1 {v.stock_branch1 || 0} · С2 {v.stock_branch2 || 0}</span>
                       </button>
                     ))}
                   </div>
@@ -735,7 +737,7 @@ export default function KassaPage() {
             <p className="text-sm font-semibold mb-1">{restockOpen.product.name}</p>
             <p className="text-xs text-ink-400 mb-4">
               {[restockOpen.variant.size, restockOpen.variant.color].filter(Boolean).join(" / ") || "—"}
-              {" · "}одоо: 📦 {restockOpen.variant.stock || 0}
+              {" · "}🏪 С1: {restockOpen.variant.stock_branch1 || 0} · С2: {restockOpen.variant.stock_branch2 || 0}
             </p>
 
             <p className="text-xs font-semibold text-ink-400 mb-2">🏪 Аль салбарт?</p>
