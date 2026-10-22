@@ -47,6 +47,7 @@ export default function KassaPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySales, setHistorySales] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [payExp, setPayExp] = useState({});
   const [branch, setBranch] = useState("branch1");
   const [unlocked, setUnlocked] = useState(false);
   const [pwInput, setPwInput] = useState("");
@@ -839,22 +840,25 @@ export default function KassaPage() {
         const grand = txs.reduce((s, x) => s + x.total, 0);
         const grandQty = txs.reduce((s, x) => s + x.qty, 0);
 
-        // 💰 Төлбөрийн задаргаа (хэлбэрээр + салбараар)
-        const methodTotals = {};
-        const branchTotals = {};
-        for (const tx of txs) {
-          const bKey = tx.branch || "other";
-          branchTotals[bKey] = (branchTotals[bKey] || 0) + tx.total;
-          const payArr = tx.items[0]?.payments;
-          if (Array.isArray(payArr) && payArr.length > 0) {
-            for (const p of payArr) {
-              const m = p.method || "other";
-              methodTotals[m] = (methodTotals[m] || 0) + Number(p.amount || 0);
+        // 💰 Төлбөрийн задаргаа — салбар → төлбөрийн төрөл (admin шиг)
+        const branchesData = {};
+        for (const s of historySales) {
+          const branch = s.branch || "branch1";
+          if (!branchesData[branch]) branchesData[branch] = { payments: {}, mixedBreakdown: {} };
+          const pm = s.payment_method || "other";
+          const isMixed = typeof pm === "string" && pm.startsWith("mixed:");
+          const bucket = isMixed ? "mixed" : pm;
+          if (!branchesData[branch].payments[bucket]) branchesData[branch].payments[bucket] = { qty: 0, total: 0, items: [] };
+          branchesData[branch].payments[bucket].qty += Number(s.qty || 0);
+          branchesData[branch].payments[bucket].total += Number(s.total || 0);
+          branchesData[branch].payments[bucket].items.push(s);
+          if (isMixed && Array.isArray(s.payments)) {
+            const paySum = s.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            const ratio = paySum > 0 ? Number(s.total || 0) / paySum : 0;
+            for (const p of s.payments) {
+              const portion = Math.round(Number(p.amount || 0) * ratio);
+              branchesData[branch].mixedBreakdown[p.method] = (branchesData[branch].mixedBreakdown[p.method] || 0) + portion;
             }
-          } else {
-            let m = tx.payment_method || "other";
-            if (typeof m === "string" && m.startsWith("mixed:")) m = "mixed";
-            methodTotals[m] = (methodTotals[m] || 0) + tx.total;
           }
         }
 
@@ -868,6 +872,8 @@ export default function KassaPage() {
           if (typeof m === "string" && m.startsWith("mixed:")) return "🔀 Холимог";
           return PAY_LABELS_LOCAL[m] || m;
         };
+        const togglePay = (k) => setPayExp((p) => ({ ...p, [k]: !p[k] }));
+        const branchOrder = ["branch1", "branch2"].filter((b) => branchesData[b] && Object.keys(branchesData[b].payments).length > 0);
         const timeStr = (d) => {
           const dt = new Date(d);
           return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
@@ -891,31 +897,82 @@ export default function KassaPage() {
                 </div>
               </div>
 
-              {/* 💰 ТӨЛБӨРИЙН ЗАДАРГАА */}
+              {/* 💰 ТӨЛБӨРИЙН ЗАДАРГАА — салбараар, төлбөрийн төрлөөр */}
               {txs.length > 0 && (
-                <div className="px-4 py-3 border-b border-ink/10 space-y-2.5 bg-paper">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-ink-400 mb-1.5 font-bold">💳 Төлбөрийн хэлбэрээр</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(methodTotals).sort((a, b) => b[1] - a[1]).map(([m, amt]) => (
-                        <div key={m} className="rounded-lg bg-cream border border-ink/10 px-3 py-1.5 flex items-center gap-2">
-                          <span className="text-xs text-ink-400">{PAY_LABELS_LOCAL[m] || m}</span>
-                          <span className="font-display font-700 text-sm text-ink">{formatPrice(amt)}</span>
+                <div className="border-b border-ink/10 bg-paper">
+                  {branchOrder.map((bk) => {
+                    const bd = branchesData[bk];
+                    const branchTotal = Object.values(bd.payments).reduce((s, p) => s + p.total, 0);
+                    const branchQty = Object.values(bd.payments).reduce((s, p) => s + p.qty, 0);
+                    return (
+                      <div key={bk} className="border-t border-ink/5 first:border-t-0">
+                        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-wider text-ink">🏪 {bk === "branch1" ? "Салбар 1" : "Салбар 2"}</p>
+                          <p className="text-xs font-bold">
+                            <span className="text-green-600">{branchQty} ш</span>
+                            <span className="text-ink-400 mx-1.5">·</span>
+                            <span className="text-beak-600">{formatPrice(branchTotal)}</span>
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-ink-400 mb-1.5 font-bold">🏪 Салбараар</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(branchTotals).sort((a, b) => b[1] - a[1]).map(([bk, amt]) => (
-                        <div key={bk} className="rounded-lg bg-cream border border-ink/10 px-3 py-1.5 flex items-center gap-2">
-                          <span className="text-xs text-ink-400">{bk === "branch1" ? "Салбар 1" : bk === "branch2" ? "Салбар 2" : "Бусад"}</span>
-                          <span className="font-display font-700 text-sm text-ink">{formatPrice(amt)}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-4 pt-0">
+                          {Object.entries(bd.payments).sort((a, b) => b[1].total - a[1].total).map(([pm, data]) => {
+                            const pct = branchTotal > 0 ? (data.total / branchTotal) * 100 : 0;
+                            const ekey = `${bk}_${pm}`;
+                            const isOpen = payExp[ekey];
+                            return (
+                              <div key={pm} className="rounded-xl border border-ink/10 bg-cream/40 overflow-hidden">
+                                <button onClick={() => togglePay(ekey)} className="w-full p-3 text-left hover:bg-cream/70 transition">
+                                  <div className="flex items-start justify-between mb-1.5">
+                                    <div>
+                                      <p className="text-sm font-bold">{payL(pm)}</p>
+                                      <p className="text-xs text-ink-400 mt-0.5">{data.qty} ширхэг</p>
+                                    </div>
+                                    <span className="rounded-full bg-beak-100 text-beak-600 px-2 py-0.5 text-[10px] font-bold">{pct.toFixed(0)}%</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <p className="font-display font-700 text-lg">{formatPrice(data.total)}</p>
+                                    <span className="text-ink-400 text-xs">{isOpen ? "▲ Хаах" : "▼ Дэлгэрэнгүй"}</span>
+                                  </div>
+                                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
+                                    <div className="h-full bg-beak transition-all" style={{ width: `${pct}%` }} />
+                                  </div>
+                                </button>
+                                {isOpen && (
+                                  <div className="border-t border-ink/10 bg-paper p-3 space-y-1.5">
+                                    {pm === "mixed" && Object.keys(bd.mixedBreakdown).length > 0 && (
+                                      <div className="mb-2 p-2 rounded-lg bg-beak-100/50 border border-beak/30">
+                                        <p className="text-[10px] font-bold text-beak-600 uppercase mb-1">Төлбөрийн задаргаа</p>
+                                        <div className="space-y-0.5">
+                                          {Object.entries(bd.mixedBreakdown).sort((a, b) => b[1] - a[1]).map(([method, amount]) => (
+                                            <div key={method} className="flex justify-between text-xs">
+                                              <span className="text-ink">{payL(method)}</span>
+                                              <span className="font-bold text-beak-600">{formatPrice(amount)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {data.items.map((it, i) => (
+                                      <div key={i} className="flex items-start justify-between gap-2 text-xs py-1 border-b border-ink/5 last:border-0">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold truncate">{it.product_name || "—"}</p>
+                                          {(it.size || it.color) && <p className="text-ink-400 text-[10px]">{[it.size, it.color].filter(Boolean).join(" / ")}</p>}
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <p className="text-ink-400">×{it.qty}</p>
+                                          <p className="font-semibold">{formatPrice(it.total)}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
