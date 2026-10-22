@@ -839,9 +839,29 @@ export default function KassaPage() {
         const grand = txs.reduce((s, x) => s + x.total, 0);
         const grandQty = txs.reduce((s, x) => s + x.qty, 0);
 
+        // 💰 Төлбөрийн задаргаа (хэлбэрээр + салбараар)
+        const methodTotals = {};
+        const branchTotals = {};
+        for (const tx of txs) {
+          const bKey = tx.branch || "other";
+          branchTotals[bKey] = (branchTotals[bKey] || 0) + tx.total;
+          const payArr = tx.items[0]?.payments;
+          if (Array.isArray(payArr) && payArr.length > 0) {
+            for (const p of payArr) {
+              const m = p.method || "other";
+              methodTotals[m] = (methodTotals[m] || 0) + Number(p.amount || 0);
+            }
+          } else {
+            let m = tx.payment_method || "other";
+            if (typeof m === "string" && m.startsWith("mixed:")) m = "mixed";
+            methodTotals[m] = (methodTotals[m] || 0) + tx.total;
+          }
+        }
+
         const PAY_LABELS_LOCAL = {
           cash: "💵 Бэлэн", card: "💳 Карт", pocket: "📱 Pocket",
           storepay: "🛍 StorePay", dans: "🏦 Данс", qpay: "QPay",
+          mixed: "🔀 Холимог", other: "Бусад",
         };
         const payL = (m) => {
           if (!m) return "Бусад";
@@ -870,6 +890,34 @@ export default function KassaPage() {
                   <p className="font-display font-700 text-xl text-green-600">{grandQty}</p>
                 </div>
               </div>
+
+              {/* 💰 ТӨЛБӨРИЙН ЗАДАРГАА */}
+              {txs.length > 0 && (
+                <div className="px-4 py-3 border-b border-ink/10 space-y-2.5 bg-paper">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-ink-400 mb-1.5 font-bold">💳 Төлбөрийн хэлбэрээр</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(methodTotals).sort((a, b) => b[1] - a[1]).map(([m, amt]) => (
+                        <div key={m} className="rounded-lg bg-cream border border-ink/10 px-3 py-1.5 flex items-center gap-2">
+                          <span className="text-xs text-ink-400">{PAY_LABELS_LOCAL[m] || m}</span>
+                          <span className="font-display font-700 text-sm text-ink">{formatPrice(amt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-ink-400 mb-1.5 font-bold">🏪 Салбараар</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(branchTotals).sort((a, b) => b[1] - a[1]).map(([bk, amt]) => (
+                        <div key={bk} className="rounded-lg bg-cream border border-ink/10 px-3 py-1.5 flex items-center gap-2">
+                          <span className="text-xs text-ink-400">{bk === "branch1" ? "Салбар 1" : bk === "branch2" ? "Салбар 2" : "Бусад"}</span>
+                          <span className="font-display font-700 text-sm text-ink">{formatPrice(amt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {historyLoading ? (
