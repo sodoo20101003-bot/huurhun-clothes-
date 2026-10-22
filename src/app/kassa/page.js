@@ -402,10 +402,10 @@ export default function KassaPage() {
               📝 Гараар захиалга
             </a>
             <a
-              href="/kassa/report"
+              href="/kassa/manage"
               className="rounded-full bg-cream/20 hover:bg-cream/30 px-3 py-1 text-xs font-bold transition"
             >
-              📅 Тайлан
+              📦 Бараа
             </a>
             <button
               onClick={openHistory}
