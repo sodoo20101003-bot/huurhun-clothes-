@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getQpayToken, qpayBaseUrl } from "@/lib/qpay";
+import { sendEmail, orderPaidEmailHtml } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ async function handle(request) {
     const admin = createAdminClient();
     const { data: order } = await admin
       .from("orders")
-      .select("id, order_code, qpay_invoice_id, payment_status, items")
+      .select("id, order_code, qpay_invoice_id, payment_status, items, customer_name, total")
       .eq("order_code", code)
       .single();
     if (!order) return NextResponse.json({ error: "Захиалга олдсонгүй" }, { status: 404 });
@@ -77,6 +78,19 @@ async function handle(request) {
           order_code: order.order_code,
         }));
         if (rows.length) await admin.from("sales").insert(rows);
+
+        // ✅ Төлбөр баталгаажсаны дараа имэйл явуулах (customer_name нь имэйл бол)
+        if (order.customer_name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.customer_name)) {
+          try {
+            await sendEmail({
+              to: order.customer_name,
+              subject: `✅ Төлбөр амжилттай — захиалга #${order.order_code}`,
+              html: orderPaidEmailHtml(order.order_code, order.total),
+            });
+          } catch (e) {
+            console.error("Email send error:", e.message);
+          }
+        }
       }
     }
 

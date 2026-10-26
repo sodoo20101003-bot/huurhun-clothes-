@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateOrderCode } from "@/lib/utils";
 import { getQpayToken, qpayBaseUrl } from "@/lib/qpay";
-import { sendEmail, orderCreatedEmailHtml } from "@/lib/email";
 
 // QPay v2 — нэхэмжлэх үүсгэх
 async function createQpayInvoice({ code, amount, description, callbackUrl }) {
@@ -135,18 +134,7 @@ export async function POST(request) {
       console.error("QPay:", e.message);
     }
 
-    // Захиалагчийн имэйл хаягт код илгээх (customer_name талбар нь имэйл бол)
-    if (customer.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.name)) {
-      try {
-        await sendEmail({
-          to: customer.name,
-          subject: `🦆 Таны захиалгын код: ${code}`,
-          html: orderCreatedEmailHtml(code, total),
-        });
-      } catch (e) {
-        console.error("Email send error:", e.message);
-      }
-    }
+    // ⚠️ Имэйл энд явуулахгүй — төлбөр баталгаажсаны дараа qpay/callback-аас явна
 
     return NextResponse.json({ code, qpay });
   } catch (e) {
