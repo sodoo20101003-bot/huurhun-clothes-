@@ -22,7 +22,7 @@ export default async function ProfilePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-700">Миний профайл</h1>
-          <p className="mt-1 text-ink-400">{user.email}</p>
+          <p className="mt-1 text-ink-400">{user.user_metadata?.phone ? `📱 ${user.user_metadata.phone}` : user.email}</p>
         </div>
         <SignOut />
       </div>
