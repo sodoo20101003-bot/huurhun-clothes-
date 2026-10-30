@@ -117,31 +117,36 @@ export default function KassaManage() {
   async function uploadImgs(files) {
     const imgs = [];
     for (const file of files) {
-      const path = `products/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
-      const { error } = await supabase.storage.from("products").upload(path, file);
-      if (error) { alert(error.message); continue; }
-      const url = supabase.storage.from("products").getPublicUrl(path).data.publicUrl;
-      imgs.push({ url, color: null });
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch("/api/manage/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || "Зураг оруулахад алдаа"); continue; }
+        imgs.push({ url: data.url, color: null });
+      } catch (e) { alert(e.message); }
     }
     setForm((f) => ({ ...f, images: [...f.images, ...imgs] }));
   }
   async function saveProduct() {
     if (!form.name.trim() || !form.price) return alert("Нэр болон үнэ заавал");
     setBusy(true);
-    const payload = {
-      name: form.name.trim(), price: Number(form.price),
-      discount_percent: Number(form.discount_percent) || 0,
-      category_id: form.category_id || null, images: form.images, show_on_web: true,
-    };
-    const { data, error } = await supabase.from("products").insert(payload).select("id").single();
-    if (error) { setBusy(false); return alert("Алдаа: " + error.message); }
-    const variants = form.variants
-      .filter((v) => v.size || v.color || v.stock_branch1 || v.stock_branch2)
-      .map((v) => {
-        const s1 = Number(v.stock_branch1) || 0, s2 = Number(v.stock_branch2) || 0;
-        return { product_id: data.id, size: v.size || null, color: v.color || null, stock_branch1: s1, stock_branch2: s2, stock: s1 + s2 };
+    try {
+      const res = await fetch("/api/manage/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          price: Number(form.price),
+          discount_percent: Number(form.discount_percent) || 0,
+          category_id: form.category_id || null,
+          images: form.images,
+          variants: form.variants,
+        }),
       });
-    if (variants.length) await supabase.from("product_variants").insert(variants);
+      const data = await res.json();
+      if (!res.ok) { setBusy(false); return alert("Алдаа: " + (data.error || "")); }
+    } catch (e) { setBusy(false); return alert("Алдаа: " + e.message); }
     setBusy(false);
     setForm(emptyProduct);
     alert("✅ Бараа нэмэгдлээ");
@@ -152,9 +157,16 @@ export default function KassaManage() {
   async function addCategory() {
     if (!newCat.trim()) return alert("Ангиллын нэр оруулна уу");
     setCatBusy(true);
-    const { error } = await supabase.from("categories").insert({ name: newCat.trim(), slug: slugify(newCat) });
+    try {
+      const res = await fetch("/api/manage/category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCat.trim(), slug: slugify(newCat) }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCatBusy(false); return alert("Алдаа: " + (data.error || "")); }
+    } catch (e) { setCatBusy(false); return alert("Алдаа: " + e.message); }
     setCatBusy(false);
-    if (error) return alert("Алдаа: " + error.message);
     setNewCat("");
     alert("✅ Ангилал нэмэгдлээ");
     await load();
