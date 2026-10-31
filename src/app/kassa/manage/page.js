@@ -74,6 +74,9 @@ export default function KassaManage() {
   const [rNote, setRNote] = useState("");
   const [rBusy, setRBusy] = useState(false);
   const [rMsg, setRMsg] = useState("");
+  // Шинэ размер/өнгө нэмэх
+  const [newVar, setNewVar] = useState({ size: "", color: "", s1: "", s2: "" });
+  const [newVarBusy, setNewVarBusy] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -179,6 +182,30 @@ export default function KassaManage() {
     setAmounts({});
     setRNote("");
     setRMsg("");
+    setNewVar({ size: "", color: "", s1: "", s2: "" });
+  }
+  async function addNewVariant() {
+    if (!newVar.size && !newVar.color) return setRMsg("⚠️ Размер эсвэл өнгө оруулна уу");
+    setNewVarBusy(true);
+    try {
+      const res = await fetch("/api/manage/variant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: rProduct.id,
+          size: newVar.size || null,
+          color: newVar.color || null,
+          stock_branch1: newVar.s1,
+          stock_branch2: newVar.s2,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setNewVarBusy(false); return setRMsg("⚠️ " + (data.error || "Алдаа")); }
+      setRMsg("✅ Шинэ размер/өнгө нэмэгдлээ");
+      setNewVar({ size: "", color: "", s1: "", s2: "" });
+      await load();
+    } catch (e) { setRMsg("⚠️ " + e.message); }
+    setNewVarBusy(false);
   }
   function setAmt(vid, branch, val) {
     setAmounts((prev) => ({ ...prev, [vid]: { ...(prev[vid] || {}), [branch]: val } }));
@@ -308,6 +335,25 @@ export default function KassaManage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* ➕ Шинэ размер/өнгө нэмэх */}
+          <div className="card p-3 space-y-2 border border-dashed border-beak/40">
+            <p className="text-xs font-bold text-ink-400 uppercase tracking-wide">➕ Шинэ размер/өнгө нэмэх</p>
+            <div className="grid grid-cols-[1fr_1fr_56px_56px] gap-2">
+              <input value={newVar.size} onChange={(e) => setNewVar((n) => ({ ...n, size: e.target.value }))} placeholder="Размер"
+                className="rounded-md border border-ink/15 bg-paper px-2 py-2 text-sm outline-none focus:border-beak" />
+              <input value={newVar.color} onChange={(e) => setNewVar((n) => ({ ...n, color: e.target.value }))} placeholder="Өнгө"
+                className="rounded-md border border-ink/15 bg-paper px-2 py-2 text-sm outline-none focus:border-beak" />
+              <input type="number" min="0" value={newVar.s1} onChange={(e) => setNewVar((n) => ({ ...n, s1: e.target.value }))} placeholder="С1"
+                className="rounded-md border border-ink/15 bg-paper px-1 py-2 text-center text-sm outline-none focus:border-beak" />
+              <input type="number" min="0" value={newVar.s2} onChange={(e) => setNewVar((n) => ({ ...n, s2: e.target.value }))} placeholder="С2"
+                className="rounded-md border border-ink/15 bg-paper px-1 py-2 text-center text-sm outline-none focus:border-beak" />
+            </div>
+            <button onClick={addNewVariant} disabled={newVarBusy}
+              className="w-full rounded-lg border border-beak bg-beak-100/40 px-3 py-2 text-sm font-semibold text-beak-600 hover:bg-beak-100">
+              {newVarBusy ? "Нэмж..." : "➕ Нэмэх"}
+            </button>
           </div>
 
           {rMsg && <div className={`card p-3 text-center text-sm ${rMsg.startsWith("✅") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{rMsg}</div>}
