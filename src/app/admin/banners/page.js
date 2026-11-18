@@ -44,9 +44,31 @@ export default function AdminBanners() {
     return products.filter((p) => p.name.toLowerCase().includes(q));
   }, [products, pSearch]);
 
+  // Зургийг browser дээр жижигрүүлэх (утсан дээр найдвартай харагдуулахын тулд)
+  function resizeImage(file, maxW = 1920, quality = 0.85) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
   async function uploadImg(file) {
-    const path = `banners/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const { error } = await supabase.storage.from("products").upload(path, file);
+    const blob = await resizeImage(file);
+    const path = `banners/${Date.now()}-banner.jpg`;
+    const { error } = await supabase.storage.from("products").upload(path, blob, { contentType: "image/jpeg" });
     if (error) return alert(error.message);
     const { data } = supabase.storage.from("products").getPublicUrl(path);
     setForm((f) => ({ ...f, image: data.publicUrl }));

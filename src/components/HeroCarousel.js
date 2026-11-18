@@ -7,16 +7,16 @@ const DURATION = 5000;
 
 export default function HeroCarousel({ banners = [] }) {
   const [i, setI] = useState(0);
-  const [paused, setPaused] = useState(false);
   const n = banners.length;
 
   const go = useCallback((d) => setI((p) => (p + d + n) % n), [n]);
 
+  // Тасралтгүй 5 секунд тутам (i өөрчлөгдөхөд дахин тоолно)
   useEffect(() => {
-    if (n <= 1 || paused) return;
-    const t = setInterval(() => setI((p) => (p + 1) % n), DURATION);
-    return () => clearInterval(t);
-  }, [n, paused]);
+    if (n <= 1) return;
+    const t = setTimeout(() => setI((p) => (p + 1) % n), DURATION);
+    return () => clearTimeout(t);
+  }, [n, i]);
 
   if (n === 0) return null;
 
@@ -24,11 +24,7 @@ export default function HeroCarousel({ banners = [] }) {
   const href = active.link || "#shop";
 
   return (
-    <section
-      className="relative w-full overflow-hidden bg-ink"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
+    <section className="relative w-full overflow-hidden bg-ink">
       <style>{`
         @keyframes heroUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
         @keyframes heroImg{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:scale(1)}}
@@ -88,11 +84,11 @@ export default function HeroCarousel({ banners = [] }) {
         {/* Удирдлага */}
         {n > 1 && (
           <div className="absolute bottom-3 right-3 z-20 flex flex-col items-end gap-2.5 sm:bottom-6 sm:right-8">
-            <div className="hidden gap-2 sm:flex">
+            <div className="flex gap-2">
               <button onClick={() => go(-1)} aria-label="Өмнөх"
-                className="grid h-11 w-11 place-items-center rounded-full bg-cream/10 text-xl text-cream ring-1 ring-cream/25 backdrop-blur transition hover:bg-cream/20 hover:ring-cream/50">‹</button>
+                className="grid h-9 w-9 place-items-center rounded-full bg-ink/55 text-lg text-cream ring-1 ring-cream/30 backdrop-blur transition hover:bg-ink/80 sm:h-11 sm:w-11 sm:text-xl">‹</button>
               <button onClick={() => go(1)} aria-label="Дараах"
-                className="grid h-11 w-11 place-items-center rounded-full bg-cream/10 text-xl text-cream ring-1 ring-cream/25 backdrop-blur transition hover:bg-cream/20 hover:ring-cream/50">›</button>
+                className="grid h-9 w-9 place-items-center rounded-full bg-ink/55 text-lg text-cream ring-1 ring-cream/30 backdrop-blur transition hover:bg-ink/80 sm:h-11 sm:w-11 sm:text-xl">›</button>
             </div>
             <div className="flex items-center gap-1.5">
               {banners.map((_, idx) => (
@@ -100,7 +96,7 @@ export default function HeroCarousel({ banners = [] }) {
                   className={`h-1.5 overflow-hidden rounded-full bg-cream/35 transition-all duration-300 ${idx === i ? "w-9" : "w-1.5 hover:bg-cream/60"}`}>
                   {idx === i && (
                     <span key={i} className="block h-full w-full origin-left rounded-full bg-beak"
-                      style={{ animation: `heroBar ${DURATION}ms linear both`, animationPlayState: paused ? "paused" : "running" }} />
+                      style={{ animation: `heroBar ${DURATION}ms linear both` }} />
                   )}
                 </button>
               ))}
