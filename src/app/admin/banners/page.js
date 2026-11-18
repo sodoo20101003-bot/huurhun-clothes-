@@ -1,18 +1,69 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { firstImageUrl } from "@/lib/utils";
 
 const emptyForm = { title: "", subtitle: "", link: "", image: "", sort: 0 };
-
-// "/product/<id>" холбоосоос id гаргах
 const productIdFromLink = (link) => (link && link.startsWith("/product/") ? link.slice(9) : "");
+
+// Зураг + нэртэй, хайлттай бараа сонгогч
+function ProductPicker({ products, value, onChange }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = products.find((p) => String(p.id) === String(value));
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    const base = s ? products.filter((p) => p.name.toLowerCase().includes(s)) : products;
+    return base.slice(0, 50);
+  }, [products, q]);
+
+  if (selected && !open) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-ink/15 bg-paper p-2">
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-cream">
+          {firstImageUrl(selected.images) && <img src={firstImageUrl(selected.images)} alt="" className="h-full w-full object-cover" />}
+        </div>
+        <span className="flex-1 min-w-0 truncate text-sm font-semibold">{selected.name}</span>
+        <button onClick={() => setOpen(true)} className="text-xs rounded-lg border border-ink/15 px-2.5 py-1.5">Солих</button>
+        <button onClick={() => onChange("")} className="text-xs text-red-500 hover:underline">Арилгах</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-ink/15 bg-paper p-2">
+      <div className="flex gap-2">
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Бараа хайх..."
+          className="flex-1 rounded-lg border border-ink/15 bg-paper px-3 py-2 text-sm outline-none focus:border-beak" />
+        {selected && <button onClick={() => setOpen(false)} className="text-xs rounded-lg border border-ink/15 px-2.5">Болих</button>}
+      </div>
+      <div className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+        <button onClick={() => { onChange(""); setOpen(false); }}
+          className={`flex w-full items-center gap-2 rounded-lg p-2 text-left text-sm hover:bg-cream ${!value ? "bg-cream" : ""}`}>
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-cream text-ink-400">🏬</span>
+          <span className="text-ink-400">Бараа сонгоогүй (дэлгүүр рүү)</span>
+        </button>
+        {filtered.map((p) => (
+          <button key={p.id} onClick={() => { onChange(p.id); setOpen(false); setQ(""); }}
+            className={`flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-cream ${String(value) === String(p.id) ? "bg-beak-100" : ""}`}>
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-cream">
+              {firstImageUrl(p.images) && <img src={firstImageUrl(p.images)} alt="" className="h-full w-full object-cover" />}
+            </div>
+            <span className="flex-1 min-w-0 truncate text-sm font-medium">{p.name}</span>
+          </button>
+        ))}
+        {filtered.length === 0 && <p className="p-3 text-center text-xs text-ink-400">Олдсонгүй</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminBanners() {
   const supabase = createClient();
   const [list, setList] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyForm);
-  const [pSearch, setPSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -27,24 +78,11 @@ export default function AdminBanners() {
     setList(data || []);
   }
   async function loadProducts() {
-    const { data } = await supabase.from("products").select("id,name").order("name").range(0, 4999);
+    const { data } = await supabase.from("products").select("id,name,images").order("name").range(0, 4999);
     setProducts(data || []);
   }
   useEffect(() => { load(); loadProducts(); }, []);
 
-  const productName = useMemo(() => {
-    const m = {};
-    for (const p of products) m[p.id] = p.name;
-    return m;
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    const q = pSearch.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) => p.name.toLowerCase().includes(q));
-  }, [products, pSearch]);
-
-  // Зургийг browser дээр жижигрүүлэх (утсан дээр найдвартай харагдуулахын тулд)
   function resizeImage(file, maxW = 1920, quality = 0.85) {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(file);
@@ -88,7 +126,6 @@ export default function AdminBanners() {
     setBusy(false);
     if (error) return alert("Алдаа: " + error.message);
     setForm(emptyForm);
-    setPSearch("");
     await load();
   }
   async function update(b, patch) {
@@ -101,13 +138,14 @@ export default function AdminBanners() {
     await load();
   }
 
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-xl font-700">🖼 Нүүрний баннер</h2>
         <p className="text-sm text-ink-400 mt-1">
           Нүүрний эхний том зураг. Хэд хэдэн баннер нэмбэл автоматаар солигдоно. Зураг дээр дарахад сонгосон бараа руу орно.
-          <br />Зөвлөмж: <b>хэвтээ зураг</b> (ж: 2400×700), гол объект нь <b>баруун талд</b> байвал зүүн талын бичигтэй таарна.
+          <br />Зураг автоматаар жижигрэнэ. <b>Хэвтээ зураг</b> (ж: 2000×650) тохиромжтой.
         </p>
       </div>
 
@@ -116,7 +154,6 @@ export default function AdminBanners() {
       <div className="card p-5 space-y-4">
         <h3 className="font-display font-600">Шинэ баннер</h3>
 
-        {/* Зураг */}
         <div>
           <p className="text-sm font-semibold mb-2">Баннер зураг *</p>
           {form.image ? (
@@ -133,20 +170,10 @@ export default function AdminBanners() {
           )}
         </div>
 
-        {/* Бараа сонгох */}
         <div>
           <p className="text-sm font-semibold mb-2">Дарахад очих бараа</p>
-          <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
-            <input className="input" placeholder="🔍 Бараа хайх..." value={pSearch} onChange={(e) => setPSearch(e.target.value)} />
-            <select
-              className="input"
-              value={productIdFromLink(form.link)}
-              onChange={(e) => setForm({ ...form, link: e.target.value ? `/product/${e.target.value}` : "" })}
-            >
-              <option value="">— Бараа сонгоогүй (дэлгүүр рүү) —</option>
-              {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
+          <ProductPicker products={products} value={productIdFromLink(form.link)}
+            onChange={(pid) => setForm({ ...form, link: pid ? `/product/${pid}` : "" })} />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -161,37 +188,29 @@ export default function AdminBanners() {
         <button onClick={add} disabled={busy} className="btn-accent">{busy ? "Хадгалж байна..." : "Баннер нэмэх"}</button>
       </div>
 
-      <div className="space-y-2">
-        {list.map((b) => {
-          const pid = productIdFromLink(b.link);
-          return (
-            <div key={b.id} className="card p-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <img src={b.image} alt="" className="h-14 w-28 shrink-0 rounded-lg object-cover bg-cream" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{b.title || "Тавтай морил!"}</p>
-                  <p className="text-xs text-ink-400 truncate">
-                    🔗 {pid ? (productName[pid] || "Бараа олдсонгүй") : "Дэлгүүр рүү"}
-                  </p>
-                </div>
-                <input type="number" defaultValue={b.sort ?? 0} onBlur={(e) => update(b, { sort: Number(e.target.value) || 0 })}
-                  className="w-14 rounded-lg border border-ink/15 bg-paper px-2 py-1.5 text-center text-sm" title="Дараалал" />
-                <button onClick={() => update(b, { active: !b.active })} className={`chip ${b.active ? "border-green-500 text-green-700" : "border-ink/20 text-ink-400"}`}>
-                  {b.active ? "Идэвхтэй" : "Идэвхгүй"}
-                </button>
-                <button onClick={() => remove(b.id)} className="text-sm text-red-500 hover:underline">Устгах</button>
+      <div className="space-y-3">
+        {list.map((b) => (
+          <div key={b.id} className="card p-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <img src={b.image} alt="" className="h-14 w-28 shrink-0 rounded-lg object-cover bg-cream" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{b.title || "Тавтай морил!"}</p>
+                <p className="text-xs text-ink-400 truncate">{b.subtitle || "—"}</p>
               </div>
-              <select
-                className="w-full rounded-lg border border-ink/15 bg-paper px-3 py-2 text-sm"
-                value={pid}
-                onChange={(e) => update(b, { link: e.target.value ? `/product/${e.target.value}` : null })}
-              >
-                <option value="">— Бараа сонгоогүй (дэлгүүр рүү) —</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <input type="number" defaultValue={b.sort ?? 0} onBlur={(e) => update(b, { sort: Number(e.target.value) || 0 })}
+                className="w-14 rounded-lg border border-ink/15 bg-paper px-2 py-1.5 text-center text-sm" title="Дараалал" />
+              <button onClick={() => update(b, { active: !b.active })} className={`chip ${b.active ? "border-green-500 text-green-700" : "border-ink/20 text-ink-400"}`}>
+                {b.active ? "Идэвхтэй" : "Идэвхгүй"}
+              </button>
+              <button onClick={() => remove(b.id)} className="text-sm text-red-500 hover:underline">Устгах</button>
             </div>
-          );
-        })}
+            <div>
+              <p className="text-xs text-ink-400 mb-1">Дарахад очих бараа:</p>
+              <ProductPicker products={products} value={productIdFromLink(b.link)}
+                onChange={(pid) => update(b, { link: pid ? `/product/${pid}` : null })} />
+            </div>
+          </div>
+        ))}
         {list.length === 0 && !err && <p className="card p-4 text-sm text-ink-400">Баннер алга. Дээрээс нэмнэ үү.</p>}
       </div>
     </div>
