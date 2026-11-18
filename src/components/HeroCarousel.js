@@ -24,7 +24,7 @@ export default function HeroCarousel({ banners = [] }) {
   const href = active.link || "#shop";
 
   return (
-    <section className="mx-auto max-w-[1400px] px-3 pt-3 sm:px-4 sm:pt-5">
+    <section className="mx-auto max-w-5xl px-3 pt-3 sm:px-4 sm:pt-5">
       <style>{`
         @keyframes heroUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
         @keyframes heroZoom{from{transform:scale(1.06)}to{transform:scale(1)}}
