@@ -13,7 +13,7 @@ export default function HeroCarousel({ banners = [] }) {
 
   useEffect(() => {
     if (n <= 1 || paused) return;
-    const t = setInterval(() => setI((p) => (p + 1) % n), 5500);
+    const t = setInterval(() => setI((p) => (p + 1) % n), 5000);
     return () => clearInterval(t);
   }, [n, paused]);
 
