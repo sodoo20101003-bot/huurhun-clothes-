@@ -31,31 +31,29 @@ export default function HeroCarousel({ banners = [] }) {
     >
       <style>{`
         @keyframes heroUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes heroZoom{from{transform:scale(1.06)}to{transform:scale(1)}}
+        @keyframes heroImg{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:scale(1)}}
         @keyframes heroBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
         .heroUp{animation:heroUp .7s cubic-bezier(.2,.7,.2,1) both}
       `}</style>
 
       {/* Тогтсон өндөртэй full-width баннер */}
       <div className="relative h-[300px] sm:h-[420px] lg:h-[500px]">
-        {/* Зурагнууд — crossfade */}
-        {banners.map((b, idx) => (
-          <Link
-            key={b.id}
-            href={b.link || "#shop"}
-            aria-label={b.title || "Баннер"}
-            tabIndex={idx === i ? 0 : -1}
-            className={`absolute inset-0 block transition-opacity duration-[900ms] ease-out ${idx === i ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={b.image}
-              alt={b.title || "banner"}
-              className="h-full w-full object-cover object-center"
-              style={idx === i ? { animation: "heroZoom 6s ease-out both" } : undefined}
-            />
-          </Link>
-        ))}
+        {/* Зөвхөн идэвхтэй зураг (утасны санах ойд ээлтэй) */}
+        <Link
+          key={active.id}
+          href={href}
+          aria-label={active.title || "Баннер"}
+          className="absolute inset-0 block"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={active.image}
+            alt={active.title || "banner"}
+            className="h-full w-full object-cover object-center"
+            style={{ animation: "heroImg .9s ease-out both" }}
+            onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+          />
+        </Link>
 
         {/* Градиент давхарга */}
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(95deg,rgba(40,53,80,.96)_0%,rgba(40,53,80,.78)_26%,rgba(40,53,80,.32)_55%,rgba(40,53,80,0)_82%)]" />
