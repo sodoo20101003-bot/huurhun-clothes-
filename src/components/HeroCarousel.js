@@ -22,7 +22,7 @@ export default function HeroCarousel({ banners = [] }) {
   return (
     <section className="mx-auto max-w-[1400px] px-3 pt-3 sm:px-4 sm:pt-4">
       <div
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-ink shadow-sm sm:aspect-[21/9] lg:aspect-[7/2]"
+        className="relative grid w-full overflow-hidden rounded-2xl bg-ink shadow-sm"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -32,22 +32,22 @@ export default function HeroCarousel({ banners = [] }) {
           return (
             <div
               key={b.id}
-              className={`absolute inset-0 transition-opacity duration-700 ${active ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
+              className={`relative [grid-area:1/1] transition-opacity duration-700 ${active ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
             >
               {/* Зураг бүхэлдээ дарагдана → бараа руу */}
-              <Link href={href} className="absolute inset-0" aria-label={b.title || "Баннер"}>
+              <Link href={href} className="relative block" aria-label={b.title || "Баннер"}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={b.image} alt={b.title || "banner"} className="h-full w-full object-cover object-right" />
+                <img src={b.image} alt={b.title || "banner"} className="block h-auto w-full" />
                 <div className="absolute inset-0 bg-gradient-to-r from-ink/95 via-ink/60 to-transparent sm:via-ink/45" />
               </Link>
 
               {/* Бичиг (зүүн тал) */}
               <div className="pointer-events-none absolute inset-0 flex items-center">
-                <div className="w-full max-w-xl px-5 sm:px-10 lg:px-16 text-cream">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-cream/10 px-3 py-1 text-[11px] font-medium text-cream/90 backdrop-blur sm:text-xs">
+                <div className="w-full max-w-xl px-4 sm:px-10 lg:px-16 text-cream">
+                  <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-cream/10 px-3 py-1 text-xs font-medium text-cream/90 backdrop-blur">
                     <span className="text-beak">★</span> Албан ёсны сайт
                   </span>
-                  <h2 className="mt-3 font-display font-800 leading-[1.05] tracking-tight text-[1.75rem] sm:mt-4 sm:text-4xl lg:text-5xl">
+                  <h2 className="font-display font-800 leading-[1.05] tracking-tight text-lg sm:mt-4 sm:text-3xl lg:text-5xl">
                     {b.title || "Тавтай морил!"}
                     <span className="block text-beak">huurhun_clothes</span>
                   </h2>
@@ -56,7 +56,7 @@ export default function HeroCarousel({ banners = [] }) {
                   </p>
                   <Link
                     href={href}
-                    className="pointer-events-auto btn-accent mt-4 !px-5 !py-2.5 text-sm sm:mt-6"
+                    className="pointer-events-auto btn-accent mt-2 !px-3 !py-1.5 text-xs sm:mt-6 sm:!px-5 sm:!py-2.5 sm:text-sm"
                   >
                     Дэлгүүр үзэх →
                   </Link>
@@ -68,8 +68,8 @@ export default function HeroCarousel({ banners = [] }) {
 
         {/* Сум + цэгүүд (баруун доод) */}
         {n > 1 && (
-          <div className="absolute bottom-3 right-3 z-20 flex flex-col items-end gap-2.5 sm:bottom-6 sm:right-6">
-            <div className="flex gap-2">
+          <div className="absolute bottom-2 right-3 z-20 flex flex-col items-end gap-2.5 sm:bottom-6 sm:right-6">
+            <div className="hidden gap-2 sm:flex">
               <button onClick={() => go(-1)} aria-label="Өмнөх"
                 className="grid h-9 w-9 place-items-center rounded-full bg-ink/90 text-lg text-cream shadow transition hover:bg-ink sm:h-11 sm:w-11">‹</button>
               <button onClick={() => go(1)} aria-label="Дараах"
