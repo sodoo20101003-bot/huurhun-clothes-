@@ -8,6 +8,7 @@ export const revalidate = 0;
 
 const NAV = [
   { href: "/admin", label: "Хянах самбар" },
+  { href: "/admin/banners", label: "🖼 Нүүр баннер" },
   { href: "/admin/products", label: "Бараа" },
   { href: "/admin/inventory-branches", label: "🏪 Салбар үлдэгдэл" },
   { href: "/admin/restock-history", label: "📥 Ачааны түүх" },

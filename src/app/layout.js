@@ -1,5 +1,19 @@
 import "./globals.css";
+import { Manrope, Inter } from "next/font/google";
 import { CartProvider } from "@/context/CartContext";
+
+const display = Manrope({
+  subsets: ["latin", "cyrillic"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
+  display: "swap",
+});
+const body = Inter({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+  display: "swap",
+});
 import { FavoritesProvider } from "@/context/FavoritesContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -68,7 +82,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="mn">
+    <html lang="mn" className={`${display.variable} ${body.variable}`}>
       <head>
         <link rel="icon" type="image/jpeg" href="/logo.jpg" />
         <link rel="shortcut icon" type="image/jpeg" href="/logo.jpg" />

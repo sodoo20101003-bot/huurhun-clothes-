@@ -12,10 +12,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Атмосфер — зөөлөн навигацийн blur */
+/* Атмосфер — цэвэр навигацийн blur */
 .glass {
-  background: rgba(251, 247, 240, 0.82);
-  backdrop-filter: saturate(140%) blur(10px);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(140%) blur(14px);
 }
 
 /* Тор/цэгэн background texture */
@@ -24,27 +24,41 @@ body {
   background-size: 22px 22px;
 }
 
+@layer base {
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-tight transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-ink text-cream px-6 py-3 hover:bg-ink-600 shadow-soft;
+    @apply btn bg-ink text-cream px-6 py-3 hover:bg-ink-600;
   }
   .btn-accent {
     @apply btn bg-beak text-ink px-6 py-3 hover:bg-beak-600;
   }
   .btn-ghost {
-    @apply btn border border-ink/15 px-5 py-2.5 hover:border-ink/40 bg-paper;
+    @apply btn border border-ink/15 px-5 py-2.5 hover:border-ink/40 hover:bg-ink/[0.03] bg-paper;
   }
   .input {
-    @apply w-full rounded-2xl border border-ink/15 bg-paper px-4 py-3 outline-none focus:border-beak focus:ring-2 focus:ring-beak/30 transition;
+    @apply w-full rounded-xl border border-ink/15 bg-paper px-4 py-3 outline-none focus:border-ink/40 focus:ring-2 focus:ring-ink/10 transition;
   }
   .chip {
     @apply inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm font-medium cursor-pointer transition;
   }
   .card {
-    @apply rounded-xl2 bg-paper shadow-card;
+    @apply rounded-2xl bg-paper border border-ink/[0.07];
+  }
+  /* Жижиг том үсгэн шошго (минимал) */
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-ink-400;
+  }
+  /* Section гарчиг */
+  .h-section {
+    @apply font-display text-2xl md:text-[1.75rem] font-700 tracking-tight;
   }
 }
 

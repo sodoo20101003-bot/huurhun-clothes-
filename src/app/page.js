@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import ProductCard from "@/components/ProductCard";
+import HeroCarousel from "@/components/HeroCarousel";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export default async function Home() {
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: cats }, { data: newest }, { data: deals }, { data: promos }, { data: allProducts }, { data: featured }] =
+  const [{ data: cats }, { data: newest }, { data: deals }, { data: promos }, { data: allProducts }, { data: featured }, bannersRes] =
     await Promise.all([
       supabase.from("categories").select("name,slug,image").order("sort").limit(8),
       supabase.from("products").select("*").eq("show_on_web", true).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(8),
@@ -18,46 +19,51 @@ export default async function Home() {
       supabase.from("promotions").select("*").eq("active", true).limit(4),
       supabase.from("products").select("*").eq("show_on_web", true).order("created_at", { ascending: false }).limit(8),
       supabase.from("products").select("*").eq("show_on_web", true).eq("is_featured", true).order("created_at", { ascending: false }).limit(12),
+      supabase.from("hero_banners").select("*").eq("active", true).order("sort", { ascending: true }).order("created_at", { ascending: false }),
     ]);
+
+  // hero_banners хүснэгт байхгүй бол алдаа гаргалгүй fallback hero харуулна
+  const banners = bannersRes?.data || [];
 
   return (
     <div>
-      {/* HERO */}
+      {/* HERO — banner байвал слайдер, үгүй бол текст hero */}
+      {banners.length > 0 ? (
+        <HeroCarousel banners={banners} />
+      ) : (
       <section className="relative overflow-hidden bg-ink text-cream">
-        <div className="absolute inset-0 dot-grid opacity-30" />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-4 py-16 md:grid-cols-2 md:py-24">
+        <div className="absolute inset-0 dot-grid opacity-[0.12]" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 md:grid-cols-2 md:py-28">
           <div className="rise">
-            <span className="inline-flex rounded-full bg-beak/20 px-3 py-1 text-sm font-semibold text-beak">
-              🦆 Албан ёсны сайт
-            </span>
-            <h1 className="mt-5 font-display text-4xl font-700 leading-tight md:text-6xl">
-              Тавтай морил!<br />
-              <span className="text-beak">huurhun_clothes</span>
+            <span className="eyebrow !text-beak">Албан ёсны онлайн дэлгүүр</span>
+            <h1 className="mt-4 font-display text-4xl font-800 leading-[1.05] tracking-tight md:text-6xl">
+              Хөөрхөн,<br />загварлаг хувцас
             </h1>
-            <p className="mt-5 max-w-md text-cream/75">
-              Манай хөөрхөн дэлгүүрийн албан ёсны вэбсайтад тавтай морилно уу.
-              Загварлаг, чанартай хувцас + хурдан хүргэлт.
+            <p className="mt-6 max-w-md text-cream/70 leading-relaxed">
+              Чанартай сонголт, шуурхай хүргэлт. Өдөр бүр шинэ загвар.
             </p>
-            <div className="mt-8 flex gap-3">
+            <div className="mt-8 flex flex-wrap gap-3">
               <Link href="#shop" className="btn-accent">Дэлгүүр үзэх</Link>
               {promos?.length > 0 && (
-                <Link href="#promo" className="btn-ghost !bg-transparent !text-cream !border-cream/30">
+                <Link href="#promo" className="btn-ghost !bg-transparent !text-cream !border-cream/25 hover:!bg-cream/10">
                   Урамшуулал
                 </Link>
               )}
             </div>
           </div>
-          <div className="relative mx-auto grid h-64 w-64 place-items-center rounded-full bg-cream/5 md:h-80 md:w-80">
-            <div className="absolute inset-4 rounded-full border border-cream/15" />
-            <Image src="/logo.jpg" alt="huurhun_clothes" width={320} height={320} className="h-48 w-48 rounded-full object-cover md:h-60 md:w-60" priority />
+          <div className="relative mx-auto grid aspect-square w-full max-w-[20rem] place-items-center md:max-w-[22rem]">
+            <div className="absolute inset-0 rounded-full bg-cream/[0.04]" />
+            <div className="absolute inset-3 rounded-full border border-cream/10" />
+            <Image src="/logo.jpg" alt="huurhun_clothes" width={400} height={400} className="relative h-3/4 w-3/4 rounded-full object-cover" priority />
           </div>
         </div>
       </section>
+      )}
 
       {/* PROMOS (1+1, 1 загвар + цүнх г.м.) */}
       {promos?.length > 0 && (
         <section id="promo" className="mx-auto max-w-6xl px-4 py-12">
-          <h2 className="font-display text-2xl font-700 mb-5">🎁 Урамшуулал</h2>
+          <h2 className="h-section mb-5">🎁 Урамшуулал</h2>
           <div className={`grid gap-4 ${promos.length === 1 ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
             {promos.map((p) => (
               <div key={p.id} className="card overflow-hidden border border-beak/30 bg-beak-100">
@@ -85,7 +91,7 @@ export default async function Home() {
       {/* ОНЦЛОХ БАРАА */}
       {featured && featured.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-8">
-          <h2 className="font-display text-2xl font-700">🌟 Онцлох бараа</h2>
+          <h2 className="h-section">🌟 Онцлох бараа</h2>
           <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {featured.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
@@ -94,7 +100,7 @@ export default async function Home() {
 
       {/* CATEGORIES */}
       <section className="mx-auto max-w-6xl px-4 py-8">
-        <h2 className="font-display text-2xl font-700">Ангилал</h2>
+        <h2 className="h-section">Ангилал</h2>
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {(cats || []).map((c) => (
             <Link key={c.slug} href={`/category/${c.slug}`} className="group card relative aspect-[4/3] overflow-hidden">
@@ -115,7 +121,7 @@ export default async function Home() {
       {deals?.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-8">
           <div className="flex items-end justify-between">
-            <h2 className="font-display text-2xl font-700">🔥 Хямдрал</h2>
+            <h2 className="h-section">🔥 Хямдрал</h2>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {deals.map((p) => <ProductCard key={p.id} product={p} />)}
@@ -127,7 +133,7 @@ export default async function Home() {
       {newest && newest.length > 0 && (
         <section id="shop" className="mx-auto max-w-6xl px-4 py-8">
           <div className="flex items-end justify-between">
-            <h2 className="font-display text-2xl font-700">✨ Шинэ бараа</h2>
+            <h2 className="h-section">✨ Шинэ бараа</h2>
             <span className="text-xs text-ink-400">сүүлийн 7 хоног</span>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -139,7 +145,7 @@ export default async function Home() {
       {/* БҮХ БАРАА */}
       {allProducts && allProducts.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-8">
-          <h2 className="font-display text-2xl font-700">Бүх бараа</h2>
+          <h2 className="h-section">Бүх бараа</h2>
           <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {allProducts.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
