@@ -111,7 +111,7 @@ export async function POST(request) {
 
     // QPay (тохиргоо хийгдсэн бол)
     let qpay = null;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://huurhunclothes.com";
     try {
       qpay = await createQpayInvoice({
         code,

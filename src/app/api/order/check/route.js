@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ORDER_STATUS } from "@/lib/utils";
+import { settleQpayOrder } from "@/lib/qpay-settle";
 
 // Захиалгын код-оор төлөв шалгах (chat bot + хэрэглэгчийн хэрэгцээнд)
 export async function POST(request) {
@@ -13,12 +14,20 @@ export async function POST(request) {
     const admin = createAdminClient();
     const { data: order } = await admin
       .from("orders")
-      .select("order_code,status,payment_status,status_message,customer_name,total,items,created_at")
+      .select("id,order_code,qpay_invoice_id,status,payment_status,status_message,customer_name,total,items,created_at")
       .eq("order_code", code.trim())
       .single();
 
     if (!order) {
       return NextResponse.json({ found: false, message: "Энэ кодтой захиалга олдсонгүй. Кодоо дахин шалгана уу." });
+    }
+
+    // Төлбөр хүлээгдэж буй бол QPay-тэй дахин шалгаж баталгаажуулах (аюулгүйн тор)
+    if (order.payment_status !== "paid" && order.qpay_invoice_id) {
+      try {
+        const { paid } = await settleQpayOrder(admin, order);
+        if (paid) { order.payment_status = "paid"; order.status = "paid"; }
+      } catch (_) {}
     }
 
     const statusLabel = ORDER_STATUS[order.status] || order.status;
