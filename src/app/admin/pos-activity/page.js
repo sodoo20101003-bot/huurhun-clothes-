@@ -22,22 +22,24 @@ const branchLabel = (b) => (b === "branch1" ? "Салбар 1" : b === "branch2"
 export default function PosActivity() {
   const supabase = createClient();
   const [rows, setRows] = useState([]);
+  const [cashiers, setCashiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [range, setRange] = useState("today");
   const [pickDay, setPickDay] = useState("");
   const [who, setWho] = useState("all");
-  const [act, setAct] = useState("all");
+  const [act, setAct] = useState("all"); // all | sale | restock | added
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from("pos_activity")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(0, 100000);
+      const { data, error } = await supabase.from("pos_activity").select("*").order("created_at", { ascending: false }).range(0, 100000);
       if (error) setErr("Хүснэгт олдсонгүй. pos_activity.sql-ээ Supabase дээр ажиллуулна уу.");
       setRows(data || []);
+      try {
+        const res = await fetch("/api/admin/users");
+        const u = await res.json();
+        if (res.ok) setCashiers((u.users || []).filter((x) => x.is_cashier).map((x) => x.full_name || x.email));
+      } catch {}
       setLoading(false);
     })();
   }, []);
@@ -46,57 +48,64 @@ export default function PosActivity() {
   const todayStr = localDay(now);
   const monthStr = localMonth(now);
   const last7 = new Date(now - 7 * 86400000).toISOString();
+  const num = (v) => Number(v || 0);
 
-  const staff = useMemo(() => [...new Set(rows.map((r) => r.user_name).filter(Boolean))], [rows]);
+  const dateMatch = (d) =>
+    range === "day" && pickDay ? localDay(d) === pickDay
+    : range === "today" ? localDay(d) === todayStr
+    : range === "7d" ? d >= last7
+    : range === "month" ? localMonth(d) === monthStr
+    : true;
 
-  const filtered = useMemo(() => {
-    let arr = rows;
-    if (range === "day" && pickDay) arr = arr.filter((r) => localDay(r.created_at) === pickDay);
-    else if (range === "today") arr = arr.filter((r) => localDay(r.created_at) === todayStr);
-    else if (range === "7d") arr = arr.filter((r) => r.created_at >= last7);
-    else if (range === "month") arr = arr.filter((r) => localMonth(r.created_at) === monthStr);
-    if (who !== "all") arr = arr.filter((r) => r.user_name === who);
-    if (act !== "all") arr = arr.filter((r) => r.action === act);
-    return arr;
-  }, [rows, range, pickDay, who, act, todayStr, monthStr, last7]);
+  const dateRows = useMemo(() => rows.filter((r) => dateMatch(r.created_at)), [rows, range, pickDay, todayStr, monthStr, last7]);
 
-  // Ажилтан бүрийн дүгнэлт (сонгосон хугацаанд)
-  const perStaff = useMemo(() => {
-    const m = {};
-    for (const r of filtered) {
-      const k = r.user_name || "—";
-      if (!m[k]) m[k] = { sales: 0, saleAmt: 0, restock: 0, added: 0 };
-      if (r.action === "sale") { m[k].sales += 1; m[k].saleAmt += Number(r.amount || 0); }
-      else if (r.action === "restock") m[k].restock += 1;
-      else m[k].added += 1;
-    }
-    return Object.entries(m).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.saleAmt - a.saleAmt);
-  }, [filtered]);
+  // Бүх кассчин (профайл + бүртгэлд гарсан нэрс)
+  const staffNames = useMemo(() => {
+    const set = new Set(cashiers);
+    for (const r of rows) if (r.user_name) set.add(r.user_name);
+    return [...set];
+  }, [cashiers, rows]);
+
+  const summaryOf = (name) => {
+    const rs = dateRows.filter((r) => r.user_name === name);
+    return {
+      sales: rs.filter((r) => r.action === "sale").length,
+      saleAmt: rs.filter((r) => r.action === "sale").reduce((s, r) => s + num(r.amount), 0),
+      restock: rs.filter((r) => r.action === "restock").length,
+      added: rs.filter((r) => r.action === "add_product" || r.action === "add_variant").length,
+    };
+  };
+
+  const matchAct = (r) =>
+    act === "all" ? true : act === "added" ? (r.action === "add_product" || r.action === "add_variant") : r.action === act;
+
+  const filtered = useMemo(
+    () => dateRows.filter((r) => (who === "all" || r.user_name === who) && matchAct(r)),
+    [dateRows, who, act]
+  );
+
+  // Сонгосон кассчны үйлдлийн тоо (chip-д)
+  const whoRows = useMemo(() => (who === "all" ? [] : dateRows.filter((r) => r.user_name === who)), [dateRows, who]);
+  const cnt = {
+    all: whoRows.length,
+    sale: whoRows.filter((r) => r.action === "sale").length,
+    restock: whoRows.filter((r) => r.action === "restock").length,
+    added: whoRows.filter((r) => r.action === "add_product" || r.action === "add_variant").length,
+  };
+
+  const periodLabel = range === "day" && pickDay ? pickDay : range === "today" ? "Өнөөдөр" : range === "7d" ? "7 хоног" : range === "month" ? "Энэ сар" : "Бүх цаг";
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-display text-xl font-700">🧾 POS үйлдлийн түүх</h2>
-        <p className="text-sm text-ink-400 mt-1">Ажилтан бүр касс дээр юу зарсан, ямар ачаа/бараа нэмснийг цагтай нь харуулна.</p>
+        <p className="text-sm text-ink-400 mt-1">Ажилтны нэр дээр дарж, тэр хүний {periodLabel.toLowerCase()} юу зарсан, ямар ачаа/бараа нэмснийг хараарай.</p>
       </div>
 
       {err && <div className="card p-4 text-sm text-red-600 bg-red-50">{err}</div>}
 
-      {/* Ажилтны дүгнэлт */}
-      {perStaff.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {perStaff.map((s) => (
-            <div key={s.name} className="card p-4">
-              <p className="font-display font-700">{s.name}</p>
-              <p className="mt-1 text-sm"><span className="text-green-700 font-600">{formatPrice(s.saleAmt)}</span> <span className="text-ink-400">· {s.sales} удаа зарсан</span></p>
-              <p className="text-xs text-ink-400 mt-0.5">📦 {s.restock} ачаа · ➕ {s.added} бараа/размер</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Шүүлтүүр */}
-      <div className="card p-3 space-y-3">
+      {/* Огноо */}
+      <div className="card p-3">
         <div className="flex flex-wrap items-center gap-2">
           {[{ v: "today", l: "Өнөөдөр" }, { v: "7d", l: "7 хоног" }, { v: "month", l: "Энэ сар" }, { v: "all", l: "Бүгд" }].map((r) => (
             <button key={r.v} onClick={() => { setRange(r.v); setPickDay(""); }}
@@ -105,18 +114,44 @@ export default function PosActivity() {
           <input type="date" value={pickDay} onChange={(e) => { setPickDay(e.target.value); setRange(e.target.value ? "day" : "today"); }}
             className="rounded-lg border border-ink/15 bg-paper px-3 py-2 text-sm" />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={who} onChange={(e) => setWho(e.target.value)} className="rounded-lg border border-ink/15 bg-paper px-3 py-2 text-sm">
-            <option value="all">Бүх ажилтан</option>
-            {staff.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={act} onChange={(e) => setAct(e.target.value)} className="rounded-lg border border-ink/15 bg-paper px-3 py-2 text-sm">
-            <option value="all">Бүх үйлдэл</option>
-            {Object.entries(ACTION).map(([k, v]) => <option key={k} value={k}>{v.l}</option>)}
-          </select>
-          <span className="ml-auto text-sm text-ink-400">{filtered.length} үйлдэл</span>
-        </div>
       </div>
+
+      {/* Кассчин картууд — дарж сонгоно */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <button onClick={() => { setWho("all"); setAct("all"); }}
+          className={`card p-4 text-left transition ${who === "all" ? "ring-2 ring-ink" : "hover:shadow-card"}`}>
+          <p className="font-display font-700">👥 Бүгд</p>
+          <p className="mt-1 text-xs text-ink-400">{dateRows.length} үйлдэл</p>
+        </button>
+        {staffNames.map((name) => {
+          const s = summaryOf(name);
+          return (
+            <button key={name} onClick={() => { setWho(name); setAct("all"); }}
+              className={`card p-4 text-left transition ${who === name ? "ring-2 ring-ink" : "hover:shadow-card"}`}>
+              <p className="font-display font-700 truncate">{name}</p>
+              <p className="mt-1 text-sm"><span className="text-green-700 font-600">{formatPrice(s.saleAmt)}</span></p>
+              <p className="text-xs text-ink-400 mt-0.5">🛒 {s.sales} · 📦 {s.restock} · ➕ {s.added}</p>
+            </button>
+          );
+        })}
+        {staffNames.length === 0 && !err && <p className="col-span-full text-sm text-ink-400 p-2">Ажилтан алга.</p>}
+      </div>
+
+      {/* Сонгосон кассчны үйлдлийн төрлүүд */}
+      {who !== "all" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold mr-1">{who}:</span>
+          {[
+            { v: "all", l: `Бүгд (${cnt.all})` },
+            { v: "sale", l: `🛒 Зарсан (${cnt.sale})` },
+            { v: "restock", l: `📦 Ачаа (${cnt.restock})` },
+            { v: "added", l: `➕ Нэмсэн (${cnt.added})` },
+          ].map((a) => (
+            <button key={a.v} onClick={() => setAct(a.v)}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${act === a.v ? "bg-ink text-cream" : "bg-cream hover:bg-beak-100"}`}>{a.l}</button>
+          ))}
+        </div>
+      )}
 
       {/* Жагсаалт */}
       {loading ? <p className="text-ink-400">Ачаалж байна...</p> : (
@@ -125,8 +160,8 @@ export default function PosActivity() {
             const a = ACTION[r.action] || { l: r.action, tone: "text-ink" };
             return (
               <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm">
-                <span className="font-mono text-xs text-ink-400 w-24 shrink-0">{localDay(r.created_at)} {localTime(r.created_at)}</span>
-                <span className="font-semibold w-24 shrink-0 truncate">{r.user_name}</span>
+                <span className="font-mono text-xs text-ink-400 w-28 shrink-0">{localDay(r.created_at)} {localTime(r.created_at)}</span>
+                {who === "all" && <span className="font-semibold w-20 shrink-0 truncate">{r.user_name}</span>}
                 <span className={`font-medium ${a.tone}`}>{a.l}</span>
                 {r.branch && <span className="chip text-xs border-ink/15 text-ink-400">{branchLabel(r.branch)}</span>}
                 <span className="flex-1 min-w-0 truncate text-ink-400">{r.detail}</span>
