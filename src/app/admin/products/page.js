@@ -25,6 +25,8 @@ export default function AdminProducts() {
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("all"); // all | low | out
+  const [branchView, setBranchView] = useState("both"); // both | branch1 | branch2
+  const [expandedId, setExpandedId] = useState(null);
   const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(empty);
@@ -467,6 +469,22 @@ export default function AdminProducts() {
           ))}
           <span className="ml-auto text-sm text-ink-400">{filtered.length} / {products.length}</span>
         </div>
+        {/* Салбарын харагдац + нийт үлдэгдэл */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-ink/5 pt-3">
+          {[
+            { v: "both", l: "🏪 Бүх салбар" },
+            { v: "branch1", l: "Салбар 1" },
+            { v: "branch2", l: "Салбар 2" },
+          ].map((b) => (
+            <button key={b.v} onClick={() => setBranchView(b.v)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${branchView === b.v ? "bg-ink text-cream" : "bg-cream hover:bg-beak-100"}`}>{b.l}</button>
+          ))}
+          <div className="ml-auto flex items-center gap-3 text-sm">
+            <span className="text-ink-400">Нийт үлдэгдэл:</span>
+            {(branchView === "both" || branchView === "branch1") && <span className="font-600">С1 <b className="text-green-600">{filtered.reduce((s, p) => s + p._stock1, 0)}</b></span>}
+            {(branchView === "both" || branchView === "branch2") && <span className="font-600">С2 <b className="text-beak-600">{filtered.reduce((s, p) => s + p._stock2, 0)}</b></span>}
+          </div>
+        </div>
       </div>
 
       <div className="card divide-y divide-ink/5 p-2">
@@ -484,32 +502,52 @@ export default function AdminProducts() {
                 </div>
                 <p className="text-xs text-ink-400">
                   {p.categories?.name || "—"} · {formatPrice(finalPrice(p.price, p.discount_percent))}
-                  {" · "}
-                  <span className={`font-semibold ${p._totalStock === 0 ? "text-red-500" : p._totalStock < 5 ? "text-beak-600" : "text-green-600"}`}>
-                    📦 {p._totalStock} ({p._stock1}+{p._stock2})
-                  </span>
+                </p>
+                <p className="mt-0.5 text-xs flex flex-wrap items-center gap-x-2">
+                  {(branchView === "both" || branchView === "branch1") && (
+                    <span className={`font-semibold ${p._stock1 === 0 ? "text-red-500" : p._stock1 < 5 ? "text-beak-600" : "text-green-600"}`}>🏪 С1: {p._stock1}</span>
+                  )}
+                  {(branchView === "both" || branchView === "branch2") && (
+                    <span className={`font-semibold ${p._stock2 === 0 ? "text-red-500" : p._stock2 < 5 ? "text-beak-600" : "text-green-600"}`}>🏪 С2: {p._stock2}</span>
+                  )}
+                  {branchView === "both" && <span className="text-ink-400">· нийт {p._totalStock}</span>}
                 </p>
               </div>
               
+              {p._variants?.length > 0 && (
+                <button onClick={() => setExpandedId(expandedId === p.id ? null : p.id)} className="btn-ghost !py-2 !px-3 text-sm">
+                  {expandedId === p.id ? "▴ Хаах" : `▾ Үлдэгдэл (${p._variants.length})`}
+                </button>
+              )}
               <button onClick={() => startEdit(p)} className="btn-ghost !py-2 !px-3 text-sm">Засах</button>
               <button onClick={() => remove(p.id)} className="text-sm text-red-500 hover:underline">Устгах</button>
             </div>
-            {p._variants?.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5 pl-[68px]">
-                {p._variants.map((v, i) => {
-                  const stock1 = Number(v.stock_branch1 || 0);
-                  const stock2 = Number(v.stock_branch2 || 0);
-                  const total = stock1 + stock2;
-                  return (
-                    <span key={i} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      total === 0 ? "bg-red-50 text-red-600 border border-red-200" :
-                      total < 5 ? "bg-beak-100 text-beak-600 border border-beak/30" :
-                      "bg-green-50 text-green-700 border border-green-200"
-                    }`}>
-                      {[v.size, v.color].filter(Boolean).join(" / ") || "—"}: <b>{stock1}</b> | <b>{stock2}</b>
-                    </span>
-                  );
-                })}
+
+            {/* Салбарын үлдэгдэл — цэвэр хүснэгт */}
+            {p._variants?.length > 0 && expandedId === p.id && (
+              <div className="mt-2 ml-0 sm:ml-[68px] overflow-hidden rounded-xl border border-ink/10">
+                <div className="grid grid-cols-[1fr_64px_64px_60px] bg-ink text-cream text-xs font-semibold">
+                  <div className="px-3 py-2">Variant</div>
+                  <div className="px-2 py-2 text-center">🏪 С1</div>
+                  <div className="px-2 py-2 text-center">🏪 С2</div>
+                  <div className="px-2 py-2 text-center">Нийт</div>
+                </div>
+                <div className="divide-y divide-ink/5">
+                  {p._variants.map((v, i) => {
+                    const s1 = Number(v.stock_branch1 || 0);
+                    const s2 = Number(v.stock_branch2 || 0);
+                    const t = s1 + s2;
+                    const col = (n) => (n === 0 ? "text-red-500" : n < 5 ? "text-beak-600" : "text-green-600");
+                    return (
+                      <div key={i} className="grid grid-cols-[1fr_64px_64px_60px] items-center text-sm">
+                        <div className="px-3 py-2 font-medium">{[v.size, v.color].filter(Boolean).join(" · ") || "—"}</div>
+                        <div className={`px-2 py-2 text-center font-bold ${col(s1)} ${branchView === "branch2" ? "opacity-30" : ""}`}>{s1}</div>
+                        <div className={`px-2 py-2 text-center font-bold ${col(s2)} ${branchView === "branch1" ? "opacity-30" : ""}`}>{s2}</div>
+                        <div className="px-2 py-2 text-center text-ink-400">{t}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
