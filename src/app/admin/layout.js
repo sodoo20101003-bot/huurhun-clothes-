@@ -18,6 +18,7 @@ const NAV = [
   { href: "/admin/brands", label: "🏷 Брэнд" },
   { href: "/admin/bundle-promos", label: "🎁 Урамшуулал" },
   { href: "/admin/orders", label: "Захиалга" },
+  { href: "/admin/online-orders", label: "🌐 Онлайн захиалга" },
   { href: "/admin/orders/new", label: "📝 Гараар захиалга" },
   { href: "/admin/kassa-history", label: "📋 Кассын түүх" },
   { href: "/admin/reports", label: "📊 Тайлан" },
