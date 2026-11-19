@@ -22,9 +22,8 @@ const GROUPS = [
   {
     title: "Бараа & Агуулах",
     items: [
-      { href: "/admin/products", label: "Бараа" },
-      { href: "/admin/inventory-branches", label: "🏪 Салбар үлдэгдэл" },
-      { href: "/admin/bulk-restock", label: "📦 Ачаа нэмэх" },
+      { href: "/admin/products", label: "📦 Бараа & үлдэгдэл" },
+      { href: "/admin/bulk-restock", label: "📥 Ачаа нэмэх" },
       { href: "/admin/restock-history", label: "📥 Ачааны түүх" },
       { href: "/admin/categories", label: "🗂 Ангилал" },
       { href: "/admin/brands", label: "🏷 Брэнд" },

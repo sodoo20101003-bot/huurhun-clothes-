@@ -22,6 +22,9 @@ const empty = {
 export default function AdminProducts() {
   const supabase = createClient();
   const [cats, setCats] = useState([]);
+  const [q, setQ] = useState("");
+  const [catFilter, setCatFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState("all"); // all | low | out
   const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(empty);
@@ -83,6 +86,17 @@ export default function AdminProducts() {
       return sizeKey(a.size) - sizeKey(b.size);
     });
   }
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return products.filter((p) => {
+      if (query && !p.name.toLowerCase().includes(query)) return false;
+      if (catFilter && String(p.category_id) !== String(catFilter)) return false;
+      if (stockFilter === "out" && p._totalStock !== 0) return false;
+      if (stockFilter === "low" && !(p._totalStock > 0 && p._totalStock <= 3)) return false;
+      return true;
+    });
+  }, [products, q, catFilter, stockFilter]);
 
   const productColors = useMemo(
     () => [...new Set(form.variants.map((v) => v.color).filter(Boolean))],
@@ -268,7 +282,7 @@ export default function AdminProducts() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-xl font-600">Бараа ({products.length})</h2>
+        <h2 className="font-display text-xl font-600">📦 Бараа & үлдэгдэл ({products.length})</h2>
         <button onClick={startNew} className="btn-accent">+ Шинэ бараа</button>
       </div>
 
@@ -431,8 +445,32 @@ export default function AdminProducts() {
         </div>
       )}
 
+      {/* Хайлт + ангиллын шүүлт */}
+      <div className="card p-3 space-y-3">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Барааны нэрээр хайх..." className="input" />
+        <div className="flex flex-wrap gap-1.5">
+          <button onClick={() => setCatFilter("")}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${!catFilter ? "bg-ink text-cream" : "bg-cream hover:bg-beak-100"}`}>Бүх ангилал</button>
+          {cats.map((c) => (
+            <button key={c.id} onClick={() => setCatFilter(c.id)}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${String(catFilter) === String(c.id) ? "bg-ink text-cream" : "bg-cream hover:bg-beak-100"}`}>{c.name}</button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { v: "all", l: "Бүгд" },
+            { v: "low", l: "🟠 Дуусаж буй (≤3)" },
+            { v: "out", l: "🔴 Дууссан (0)" },
+          ].map((f) => (
+            <button key={f.v} onClick={() => setStockFilter(f.v)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${stockFilter === f.v ? "bg-beak text-ink" : "bg-cream hover:bg-beak-100"}`}>{f.l}</button>
+          ))}
+          <span className="ml-auto text-sm text-ink-400">{filtered.length} / {products.length}</span>
+        </div>
+      </div>
+
       <div className="card divide-y divide-ink/5 p-2">
-        {products.map((p) => (
+        {filtered.map((p) => (
           <div key={p.id} className="p-3">
             <div className="flex items-center gap-3">
               <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-cream">
@@ -477,6 +515,7 @@ export default function AdminProducts() {
           </div>
         ))}
         {products.length === 0 && <p className="p-6 text-center text-sm text-ink-400">Бараа алга.</p>}
+        {products.length > 0 && filtered.length === 0 && <p className="p-6 text-center text-sm text-ink-400">Тохирох бараа олдсонгүй.</p>}
       </div>
 
       {/* ========= 📥 АЧАА ОРОХ MODAL ========= */}
