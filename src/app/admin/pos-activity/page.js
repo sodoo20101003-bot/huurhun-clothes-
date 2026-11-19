@@ -13,6 +13,7 @@ const localTime = (d) => {
 
 const ACTION = {
   sale: { l: "🛒 Зарсан", tone: "text-green-700" },
+  manual_order: { l: "📝 Гар захиалга", tone: "text-green-700" },
   restock: { l: "📦 Ачаа нэмсэн", tone: "text-beak-600" },
   add_product: { l: "➕ Бараа нэмсэн", tone: "text-ink" },
   add_variant: { l: "➕ Размер нэмсэн", tone: "text-ink" },
@@ -68,9 +69,12 @@ export default function PosActivity() {
 
   const summaryOf = (name) => {
     const rs = dateRows.filter((r) => r.user_name === name);
+    const saleAmt = rs.filter((r) => r.action === "sale").reduce((s, r) => s + num(r.amount), 0);
+    const manualAmt = rs.filter((r) => r.action === "manual_order").reduce((s, r) => s + num(r.amount), 0);
     return {
       sales: rs.filter((r) => r.action === "sale").length,
-      saleAmt: rs.filter((r) => r.action === "sale").reduce((s, r) => s + num(r.amount), 0),
+      manual: rs.filter((r) => r.action === "manual_order").length,
+      amt: saleAmt + manualAmt,
       restock: rs.filter((r) => r.action === "restock").length,
       added: rs.filter((r) => r.action === "add_product" || r.action === "add_variant").length,
     };
@@ -89,6 +93,7 @@ export default function PosActivity() {
   const cnt = {
     all: whoRows.length,
     sale: whoRows.filter((r) => r.action === "sale").length,
+    manual: whoRows.filter((r) => r.action === "manual_order").length,
     restock: whoRows.filter((r) => r.action === "restock").length,
     added: whoRows.filter((r) => r.action === "add_product" || r.action === "add_variant").length,
   };
@@ -129,8 +134,8 @@ export default function PosActivity() {
             <button key={name} onClick={() => { setWho(name); setAct("all"); }}
               className={`card p-4 text-left transition ${who === name ? "ring-2 ring-ink" : "hover:shadow-card"}`}>
               <p className="font-display font-700 truncate">{name}</p>
-              <p className="mt-1 text-sm"><span className="text-green-700 font-600">{formatPrice(s.saleAmt)}</span></p>
-              <p className="text-xs text-ink-400 mt-0.5">🛒 {s.sales} · 📦 {s.restock} · ➕ {s.added}</p>
+              <p className="mt-1 text-sm"><span className="text-green-700 font-600">{formatPrice(s.amt)}</span></p>
+              <p className="text-xs text-ink-400 mt-0.5">🛒 {s.sales} · 📝 {s.manual} · 📦 {s.restock} · ➕ {s.added}</p>
             </button>
           );
         })}
@@ -144,6 +149,7 @@ export default function PosActivity() {
           {[
             { v: "all", l: `Бүгд (${cnt.all})` },
             { v: "sale", l: `🛒 Зарсан (${cnt.sale})` },
+            { v: "manual_order", l: `📝 Гар захиалга (${cnt.manual})` },
             { v: "restock", l: `📦 Ачаа (${cnt.restock})` },
             { v: "added", l: `➕ Нэмсэн (${cnt.added})` },
           ].map((a) => (

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logPosActivity } from "@/lib/pos-log";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +118,13 @@ export async function POST(request) {
       };
     });
     await admin.from("sales").insert(salesRows);
+
+    await logPosActivity("manual_order", {
+      branch: branch || null,
+      amount: finalTotal,
+      qty: items.reduce((s, it) => s + Number(it.qty || 0), 0),
+      detail: `#${order_code} · ${customerName || "—"} · ${items.map((it) => `${it.productName}×${it.qty}`).join(", ")}`,
+    });
 
     return NextResponse.json({ ok: true, order, order_code, stockLog });
   } catch (e) {
