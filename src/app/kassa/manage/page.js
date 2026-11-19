@@ -217,21 +217,28 @@ export default function KassaManage() {
     if (toDo.length === 0) return setRMsg("⚠️ Хэдэн ширхэг нэмэхээ бөглөнө үү");
     setRBusy(true);
     let ok = 0, fail = 0;
+    const postRestock = async (item, branch, qty) => {
+      const body = JSON.stringify({
+        productId: rProduct.id, productName: rProduct.name,
+        size: item.v.size || null, color: item.v.color || null,
+        qty, branch, note: rNote || null,
+      });
+      // 2 удаа оролдоно (түр зуурын алдаанд)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch("/api/restock", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body,
+          });
+          if (res.ok) return true;
+        } catch {}
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      return false;
+    };
     for (const item of toDo) {
       for (const [branch, qty] of [["branch1", item.s1], ["branch2", item.s2]]) {
         if (qty <= 0) continue;
-        try {
-          const res = await fetch("/api/restock", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId: rProduct.id, productName: rProduct.name,
-              size: item.v.size || null, color: item.v.color || null,
-              qty, branch, note: rNote || null,
-            }),
-          });
-          if (res.ok) ok++; else fail++;
-        } catch { fail++; }
+        if (await postRestock(item, branch, qty)) ok++; else fail++;
       }
     }
     setRBusy(false);
