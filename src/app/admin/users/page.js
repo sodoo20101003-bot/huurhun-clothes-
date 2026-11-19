@@ -29,35 +29,38 @@ export default function UsersPage() {
   }
 
   async function load() {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id,email,full_name,is_admin,is_cashier,created_at")
-      .order("created_at", { ascending: false });
-    setUsers(data || []);
+    try {
+      const res = await fetch("/api/admin/users");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Алдаа");
+      setUsers(data.users || []);
+    } catch (e) {
+      alert("Хэрэглэгч ачаалахад алдаа: " + e.message);
+    }
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
 
+  async function setRole(user, field, value) {
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, field, value }),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert("Алдаа: " + (data.error || ""));
+    await load();
+  }
+
   async function toggleCashier(user) {
     const next = !user.is_cashier;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_cashier: next })
-      .eq("id", user.id);
-    if (error) return alert(error.message);
-    alert(next ? `✅ ${user.email} нь кассы боллоо!` : `❌ ${user.email}-ийн кассы эрхийг авлаа`);
-    await load();
+    await setRole(user, "is_cashier", next);
   }
 
   async function toggleAdmin(user) {
     const next = !user.is_admin;
     if (!confirm(next ? `${user.email}-г админ болгох уу?` : `${user.email}-ийн админ эрхийг авах уу?`)) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_admin: next })
-      .eq("id", user.id);
-    if (error) return alert(error.message);
-    await load();
+    await setRole(user, "is_admin", next);
   }
 
   if (loading) return <p className="text-ink-400">Ачаалж байна...</p>;
