@@ -2,31 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOut from "../profile/SignOut";
+import AdminNav from "./AdminNav";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const NAV = [
-  { href: "/admin", label: "Хянах самбар" },
-  { href: "/admin/banners", label: "🖼 Нүүр баннер" },
-  { href: "/admin/products", label: "Бараа" },
-  { href: "/admin/inventory-branches", label: "🏪 Салбар үлдэгдэл" },
-  { href: "/admin/restock-history", label: "📥 Ачааны түүх" },
-  { href: "/admin/bulk-restock", label: "📦 Ачаа нэмэх" },
-  { href: "/admin/profit", label: "💰 Ашиг" },
-  { href: "/admin/categories", label: "🗂 Ангилал" },
-  { href: "/admin/brands", label: "🏷 Брэнд" },
-  { href: "/admin/bundle-promos", label: "🎁 Урамшуулал" },
-  { href: "/admin/orders", label: "Захиалга" },
-  { href: "/admin/online-orders", label: "🌐 Онлайн захиалга" },
-  { href: "/admin/orders/new", label: "📝 Гараар захиалга" },
-  { href: "/admin/kassa-history", label: "📋 Кассын түүх" },
-  { href: "/admin/reports", label: "📊 Тайлан" },
-  { href: "/admin/daily-payments", label: "📅 Өдөр + Төлбөр" },
-  { href: "/admin/users", label: "👥 Хэрэглэгчид" },
-  { href: "/admin/chat", label: "💬 Чат" },
-  { href: "/kassa", label: "💼 Кассаар орох →" },
-];
 
 export default async function AdminLayout({ children }) {
   const supabase = createClient();
@@ -40,18 +19,12 @@ export default async function AdminLayout({ children }) {
         <h1 className="font-display text-2xl font-700">Админ</h1>
         <Link href="/" className="text-sm text-ink-400 hover:text-ink">← Дэлгүүр рүү</Link>
       </div>
-      <div className="grid gap-4 md:grid-cols-[200px_1fr]">
-        <aside className="space-y-1">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href}
-              className={`block rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-cream transition ${
-                n.href === "/kassa" ? "bg-beak text-ink mt-3" : ""
-              } ${n.href === "/admin/orders/new" ? "bg-green-50 text-green-700 border border-green-200" : ""}`}
-            >
-              {n.label}
-            </Link>
-          ))}
-          <SignOut />
+      <div className="grid gap-4 md:grid-cols-[210px_1fr]">
+        <aside className="md:sticky md:top-4 md:self-start">
+          <AdminNav />
+          <div className="mt-2 hidden md:block">
+            <SignOut />
+          </div>
         </aside>
         <main>{children}</main>
       </div>
