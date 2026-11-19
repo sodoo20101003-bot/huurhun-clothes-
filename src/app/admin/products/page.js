@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice, finalPrice, firstImageUrl, normalizeImages } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export default function AdminProducts() {
   const [stockFilter, setStockFilter] = useState("all"); // all | low | out
   const [branchView, setBranchView] = useState("both"); // both | branch1 | branch2
   const [expandedId, setExpandedId] = useState(null);
+  const formRef = useRef(null);
   const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(empty);
@@ -185,7 +186,11 @@ export default function AdminProducts() {
     });
   }
 
-  function startNew() { setForm(empty); setOpen(true); }
+  function startNew() {
+    setForm(empty);
+    setOpen(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }
   function startEdit(p) {
     setForm({
       id: p.id, name: p.name, description: p.description || "",
@@ -206,6 +211,7 @@ export default function AdminProducts() {
       }
     });
     setOpen(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
 
   async function save() {
@@ -289,7 +295,7 @@ export default function AdminProducts() {
       </div>
 
       {open && (
-        <div className="card space-y-6 p-4 sm:p-6">
+        <div ref={formRef} className="card space-y-6 p-4 sm:p-6 scroll-mt-4">
           <h3 className="font-display text-lg font-600">{form.id ? "Бараа засах" : "Шинэ бараа нэмэх"}</h3>
 
           <div className="rounded-xl bg-cream/50 p-4 space-y-3">
