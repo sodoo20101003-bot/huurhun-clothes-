@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logPosActivity } from "@/lib/pos-log";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,11 @@ export async function POST(request) {
       stock: s1 + s2,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const { data: prod } = await admin.from("products").select("name").eq("id", productId).single();
+    await logPosActivity("add_variant", {
+      detail: `${prod?.name || "бараа"} — ${[size, color].filter(Boolean).join("/") || "размер"}`,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e) {

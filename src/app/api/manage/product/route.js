@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logPosActivity } from "@/lib/pos-log";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,8 @@ export async function POST(request) {
       const { error: vErr } = await admin.from("product_variants").insert(rows);
       if (vErr) return NextResponse.json({ error: vErr.message }, { status: 500 });
     }
+
+    await logPosActivity("add_product", { detail: String(name).trim() });
 
     return NextResponse.json({ ok: true, id: product.id });
   } catch (e) {

@@ -7,6 +7,26 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [nf, setNf] = useState({ name: "", email: "", password: "" });
+  const [nfBusy, setNfBusy] = useState(false);
+
+  async function createStaff() {
+    if (!nf.email || !nf.password) return alert("Имэйл болон нууц үг оруулна уу");
+    setNfBusy(true);
+    try {
+      const res = await fetch("/api/admin/create-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nf),
+      });
+      const data = await res.json();
+      if (!res.ok) { setNfBusy(false); return alert("Алдаа: " + (data.error || "")); }
+      alert(`✅ ${nf.name || nf.email} кассчин аккаунт үүслээ`);
+      setNf({ name: "", email: "", password: "" });
+      await load();
+    } catch (e) { alert(e.message); }
+    setNfBusy(false);
+  }
 
   async function load() {
     const { data } = await supabase
@@ -52,6 +72,18 @@ export default function UsersPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="font-display text-xl font-700">👥 Хэрэглэгчид ({users.length})</h2>
+      </div>
+
+      {/* Шинэ кассчин үүсгэх */}
+      <div className="card p-4 space-y-3 border border-beak/30">
+        <h3 className="font-display font-600">💼 Шинэ кассчин нэмэх</h3>
+        <p className="text-xs text-ink-400">Ажилтанд өөрийн имэйл + нууц үгээр касс руу нэвтрэх эрх үүсгэнэ. Нэг нууц үгийг хэд хэдэн хүнд өгч болно.</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <input className="input" placeholder="Нэр (ж: Gegee)" value={nf.name} onChange={(e) => setNf({ ...nf, name: e.target.value })} />
+          <input className="input" type="email" placeholder="Имэйл (gmail)" value={nf.email} onChange={(e) => setNf({ ...nf, email: e.target.value })} />
+          <input className="input" placeholder="Нууц үг" value={nf.password} onChange={(e) => setNf({ ...nf, password: e.target.value })} />
+        </div>
+        <button onClick={createStaff} disabled={nfBusy} className="btn-accent">{nfBusy ? "Үүсгэж байна..." : "Кассчин үүсгэх"}</button>
       </div>
 
       <div className="card p-4">

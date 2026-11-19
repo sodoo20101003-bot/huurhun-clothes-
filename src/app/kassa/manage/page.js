@@ -39,19 +39,6 @@ function sortVariants(arr) {
 export default function KassaManage() {
   const supabase = createClient();
 
-  // === Нууц үгийн хаалт ===
-  const [unlocked, setUnlocked] = useState(false);
-  const [pw, setPw] = useState("");
-  useEffect(() => {
-    try { if (sessionStorage.getItem("kassa_ok") === "1") setUnlocked(true); } catch {}
-  }, []);
-  function tryUnlock() {
-    if (pw === "huurhun2026") {
-      setUnlocked(true);
-      try { sessionStorage.setItem("kassa_ok", "1"); } catch {}
-    } else alert("Нууц үг буруу");
-  }
-
   const [tab, setTab] = useState("list");
   const [cats, setCats] = useState([]);
   const [products, setProducts] = useState([]);
@@ -99,7 +86,7 @@ export default function KassaManage() {
     })));
     setLoading(false);
   }
-  useEffect(() => { if (unlocked) load(); }, [unlocked]);
+  useEffect(() => { load(); }, []);
 
   // === Шинэ бараа ===
   function setV(i, k, val) {
@@ -261,22 +248,6 @@ export default function KassaManage() {
     const q = search.toLowerCase();
     return products.filter((p) => p.name.toLowerCase().includes(q));
   }, [products, search]);
-
-  // === НУУЦ ҮГ ===
-  if (!unlocked) {
-    return (
-      <div className="min-h-[70vh] grid place-items-center p-4">
-        <div className="card p-6 w-full max-w-xs text-center space-y-4">
-          <p className="font-display text-xl font-700">🔒 Бараа удирдлага</p>
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") tryUnlock(); }}
-            placeholder="Нууц үг" autoFocus
-            className="w-full rounded-lg border border-ink/15 bg-paper px-3 py-2.5 text-center outline-none focus:border-beak" />
-          <button onClick={tryUnlock} className="btn-accent w-full">Орох</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-5xl px-3 py-4 space-y-4">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logPosActivity } from "@/lib/pos-log";
 
 export async function POST(request) {
   try {
@@ -79,6 +80,15 @@ export async function POST(request) {
     });
 
     await admin.from("sales").insert(rows);
+
+    // Үйлдэл бүртгэх
+    await logPosActivity("sale", {
+      branch,
+      amount: finalTotal,
+      qty: items.reduce((s, it) => s + Number(it.qty || 0), 0),
+      detail: items.map((it) => `${it.productName}${it.size || it.color ? ` (${[it.size, it.color].filter(Boolean).join("/")})` : ""}×${it.qty}`).join(", "),
+    });
+
     return NextResponse.json({
       ok: true,
       total: finalTotal,

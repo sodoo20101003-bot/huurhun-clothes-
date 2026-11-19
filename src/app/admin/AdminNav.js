@@ -4,7 +4,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const GROUPS = [
-  { title: null, items: [{ href: "/admin", label: "📊 Хянах самбар" }] },
+  { title: null, items: [
+    { href: "/admin", label: "📊 Хянах самбар" },
+    { href: "/admin/pos-activity", label: "🧾 POS үйлдэл" },
+  ] },
   {
     title: "Борлуулалт",
     items: [

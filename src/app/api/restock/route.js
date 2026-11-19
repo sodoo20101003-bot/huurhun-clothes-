@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logPosActivity } from "@/lib/pos-log";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,12 @@ export async function POST(request) {
       color: color || null,
       qty: addQty,
       note: note ? `[${targetBranch === "branch1" ? "С1" : "С2"}] ${note}` : `[${targetBranch === "branch1" ? "С1" : "С2"}]`,
+    });
+
+    await logPosActivity("restock", {
+      branch: targetBranch,
+      qty: addQty,
+      detail: `${productName || "—"}${size || color ? ` (${[size, color].filter(Boolean).join("/")})` : ""}`,
     });
 
     return NextResponse.json({ ok: true, branch: targetBranch });
