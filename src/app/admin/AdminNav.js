@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const GROUPS = [
   { title: null, items: [
@@ -49,6 +50,40 @@ const GROUPS = [
 export default function AdminNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [unreadChat, setUnreadChat] = useState(0);
+  const baseTitle = useRef(null);
+
+  // Уншаагүй чатын тоо — real-time
+  useEffect(() => {
+    const supabase = createClient();
+    let channel;
+    async function refresh() {
+      try {
+        const { data } = await supabase.from("chat_sessions").select("unread_by_admin");
+        const total = (data || []).reduce((s, x) => s + Number(x.unread_by_admin || 0), 0);
+        setUnreadChat(total);
+      } catch {}
+    }
+    refresh();
+    try {
+      channel = supabase
+        .channel("admin-chat-notify")
+        .on("postgres_changes", { event: "*", schema: "public", table: "chat_sessions" }, refresh)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, refresh)
+        .subscribe();
+    } catch {}
+    const poll = setInterval(refresh, 20000);
+    return () => {
+      clearInterval(poll);
+      if (channel) try { supabase.removeChannel(channel); } catch {}
+    };
+  }, []);
+
+  // Таб гарчигт мэдэгдэл
+  useEffect(() => {
+    if (baseTitle.current == null) baseTitle.current = document.title.replace(/^\(\d+\)\s*/, "") || "Админ";
+    document.title = unreadChat > 0 ? `(${unreadChat}) 💬 ${baseTitle.current}` : baseTitle.current;
+  }, [unreadChat]);
 
   const isActive = (href) =>
     href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(href + "/");
@@ -59,7 +94,10 @@ export default function AdminNav() {
     <div>
       <button onClick={() => setOpen((o) => !o)}
         className="mb-2 flex w-full items-center justify-between rounded-xl border border-ink/15 bg-paper px-4 py-3 text-sm font-semibold md:hidden">
-        <span>{activeLabel}</span>
+        <span className="flex items-center gap-2">
+          {activeLabel}
+          {unreadChat > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">{unreadChat}</span>}
+        </span>
         <span className="text-ink-400">{open ? "▲" : "☰"}</span>
       </button>
 
@@ -72,12 +110,15 @@ export default function AdminNav() {
                 const active = isActive(n.href);
                 return (
                   <Link key={n.href} href={n.href} onClick={() => setOpen(false)}
-                    className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition ${
                       active ? "bg-ink text-cream"
                         : n.accent === "green" ? "text-green-700 hover:bg-green-50"
                         : "text-ink hover:bg-cream"
                     }`}>
-                    {n.label}
+                    <span>{n.label}</span>
+                    {n.href === "/admin/chat" && unreadChat > 0 && (
+                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white animate-pulse">{unreadChat}</span>
+                    )}
                   </Link>
                 );
               })}
