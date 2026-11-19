@@ -23,6 +23,7 @@ export default function OnlineOrders() {
   const [range, setRange] = useState("today"); // today | 7d | month | all | day
   const [pickDay, setPickDay] = useState("");
   const [pay, setPay] = useState("all"); // all | paid | unpaid
+  const [statusF, setStatusF] = useState("all"); // all | <status>
   const [openId, setOpenId] = useState(null);
 
   async function load() {
@@ -77,7 +78,23 @@ export default function OnlineOrders() {
     else if (range === "month") arr = arr.filter((o) => localMonth(o.created_at) === monthStr);
     if (pay === "paid") arr = arr.filter((o) => o.payment_status === "paid");
     else if (pay === "unpaid") arr = arr.filter((o) => o.payment_status !== "paid");
+    if (statusF !== "all") arr = arr.filter((o) => (o.status || "pending") === statusF);
     return arr;
+  }, [orders, range, pickDay, pay, statusF, todayStr, monthStr, last7]);
+
+  // Төлөв бүрийн тоо (огноо + төлбөрийн шүүлтийн дотор)
+  const statusCounts = useMemo(() => {
+    let base = orders;
+    if (range === "day" && pickDay) base = base.filter((o) => localDay(o.created_at) === pickDay);
+    else if (range === "today") base = base.filter((o) => localDay(o.created_at) === todayStr);
+    else if (range === "7d") base = base.filter((o) => o.created_at >= last7);
+    else if (range === "month") base = base.filter((o) => localMonth(o.created_at) === monthStr);
+    if (pay === "paid") base = base.filter((o) => o.payment_status === "paid");
+    else if (pay === "unpaid") base = base.filter((o) => o.payment_status !== "paid");
+    const m = { all: base.length };
+    for (const k of Object.keys(STATUS_LABELS)) m[k] = 0;
+    for (const o of base) { const k = o.status || "pending"; m[k] = (m[k] || 0) + 1; }
+    return m;
   }, [orders, range, pickDay, pay, todayStr, monthStr, last7]);
 
   const fRev = paidSum(filtered);
@@ -145,6 +162,19 @@ export default function OnlineOrders() {
             <span>{filtered.length} захиалга</span>
             <span className="text-green-600 font-semibold">💰 {formatPrice(fRev)}</span>
           </div>
+        </div>
+        {/* Төлвөөр шүүх */}
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-ink/5 pt-3">
+          <button onClick={() => setStatusF("all")}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${statusF === "all" ? "bg-ink text-cream" : "bg-cream hover:bg-beak-100"}`}>
+            Бүх төлөв <span className={statusF === "all" ? "text-cream/70" : "text-ink-400"}>{statusCounts.all}</span>
+          </button>
+          {Object.entries(STATUS_LABELS).map(([k, l]) => (
+            <button key={k} onClick={() => setStatusF(k)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${statusF === k ? "bg-ink text-cream" : "bg-cream hover:bg-beak-100"}`}>
+              {l} <span className={statusF === k ? "text-cream/70" : "text-ink-400"}>{statusCounts[k] || 0}</span>
+            </button>
+          ))}
         </div>
       </div>
 

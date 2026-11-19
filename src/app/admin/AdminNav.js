@@ -9,7 +9,6 @@ const GROUPS = [
     title: "Борлуулалт",
     items: [
       { href: "/admin/online-orders", label: "🌐 Онлайн захиалга" },
-      { href: "/admin/orders", label: "Захиалга" },
       { href: "/admin/orders/new", label: "📝 Гараар захиалга", accent: "green" },
       { href: "/admin/kassa-history", label: "📋 Кассын түүх" },
       { href: "/admin/reports", label: "📊 Тайлан" },
